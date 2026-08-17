@@ -12,12 +12,12 @@
   "topbarLinks": [
     {
       "name": "Support",
-      "url": "mailto:support@interstellas.com"
+      "url": "mailto:support@interstellas.stellasbank.com"
     }
   ],
   "topbarCtaButton": {
     "name": "Get Started",
-    "url": "https://interstellas.com"
+    "url": "https://interstellas.stellasbank.com"
   },
   "navigation": {
     "tabs": [
