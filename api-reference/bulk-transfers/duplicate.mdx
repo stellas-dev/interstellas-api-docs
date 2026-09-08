@@ -1,0 +1,175 @@
+---
+title: "Duplicate"
+description: "Create a new batch from an existing one, reusing its transfers under a new batch name."
+---
+
+Duplicating a batch is a shortcut for resubmitting the same set of transfers without rebuilding the request from scratch — useful for a recurring payout (e.g. "run last month's payroll batch again") or for recovering from a batch you deleted or lost track of. It creates a brand-new batch and a fresh copy of every item in the source batch, all reset to `pending` as if you'd just created it via [Create a bulk transfer](/api-reference/bulk-transfers/create).
+
+<Info>
+  This only copies items — it doesn't touch or affect the source batch in any way. The source batch keeps its own status and items unchanged, and duplicating it any number of times has no effect on whether it can still be duplicated again.
+</Info>
+
+### Endpoint
+
+```
+POST /clients/business/customers/funds/bulk-transfer/{bulkTransferId}/duplicate
+```
+
+### Path parameters
+
+<ParamField path="bulkTransferId" type="string" required>
+  The ID of the batch to duplicate.
+</ParamField>
+
+### Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID.
+</ParamField>
+
+### Request body
+
+<ParamField body="batchName" type="string" required>
+  Name for the new batch. Must be unique for your business, same as [Create a bulk transfer](/api-reference/bulk-transfers/create) — it can't match the source batch's name or any other existing batch.
+</ParamField>
+
+### Response
+
+<ResponseField name="status" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  `"Bulk transfer batch duplicated successfully"`.
+</ResponseField>
+
+<ResponseField name="data.bulkTransferId" type="string">
+  ID of the newly created batch.
+</ResponseField>
+
+<ResponseField name="data.bulkReference" type="string">
+  A freshly generated reference for the new batch — not the source batch's `bulkReference`.
+</ResponseField>
+
+<ResponseField name="data.batchName" type="string">
+  The `batchName` you supplied.
+</ResponseField>
+
+<ResponseField name="data.totalItems" type="integer">
+  Number of items copied from the source batch.
+</ResponseField>
+
+<ResponseField name="data.status" type="string">
+  Always `pending` — the new batch hasn't started processing.
+</ResponseField>
+
+<ResponseField name="data.resolvedItemsCount" type="integer">
+  Number of copied items that kept a resolved recipient name from the source batch (see below).
+</ResponseField>
+
+<Info>
+  This endpoint is synchronous — unlike [Create a bulk transfer](/api-reference/bulk-transfers/create) via Excel, there's no background name-enquiry step to wait for, since any recipient name already resolved on the source item is carried straight over. The new batch is ready to [process](/api-reference/bulk-transfers/process) as soon as this call returns.
+</Info>
+
+### What gets copied, and what doesn't
+
+Every item in the source batch is copied — regardless of whether it previously `completed` or `failed` — and reset to a clean state on the new batch:
+
+- **Carried over as-is:** `amount`, `receiverAccountNumber`, `receiverBankCode`/`receiverBankName`, `narration`, and `itemIndex` (order is preserved).
+- **Recipient name — conditionally carried over:** if the source item's name enquiry had already resolved (`nameEnquiryStatus: "resolved"`), the resolved `recipientName` is copied along with it, and the new item starts out already resolved — no re-verification needed. If the source item's name enquiry was never resolved (still `pending`, or `failed`), the new item starts fresh at `nameEnquiryStatus: "pending"` with no recipient name.
+- **Always reset:** every processing-related field — item `status` (back to `pending`), `transactionReference`, `errorMessage`, `errorCode`, `providerReference`, `reprocessCount`, `originalTransactionReference`, and retry/requery timestamps. The new batch's own `completedItems`/`failedItems` counters start at `0`.
+- **Never reused:** `retrievalReference`. Every copied item gets a brand-new, uniquely generated reference — the source items' references remain theirs and aren't freed up or reassigned.
+
+<Warning>
+  A batch currently `processing` can't be duplicated — wait for it to reach a final status (`completed`, `failed`, or `partially_completed`) first. A batch with zero items also can't be duplicated, since there's nothing to copy.
+</Warning>
+
+### Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f/duplicate \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
+  -H "businessId: YOUR_BUSINESS_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "batchName": "September Payroll (Retry)"
+  }'
+```
+
+```js Node.js
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f/duplicate",
+  {
+    method: "POST",
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      batchName: "September Payroll (Retry)",
+    }),
+  }
+);
+const { data } = await res.json();
+```
+
+```python Python
+import requests
+
+res = requests.post(
+    "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f/duplicate",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+        "businessId": "YOUR_BUSINESS_ID",
+    },
+    json={
+        "batchName": "September Payroll (Retry)",
+    },
+)
+print(res.json())
+```
+</CodeGroup>
+
+### Example response
+
+```json
+{
+  "status": true,
+  "message": "Bulk transfer batch duplicated successfully",
+  "data": {
+    "bulkTransferId": "9a1b2c3d-4e5f-4a8d-9e2f-000000000099",
+    "bulkReference": "STL|A1B2C3D4E5F6",
+    "batchName": "September Payroll (Retry)",
+    "totalItems": 3,
+    "status": "pending",
+    "resolvedItemsCount": 2
+  }
+}
+```
+
+### Errors
+
+| Status | Cause |
+|---|---|
+| `400 Bad Request` | `bulkTransferId` isn't a valid UUID |
+| `400 Bad Request` | `batchName` missing, empty, or over 255 characters |
+| `400 Bad Request` | Source batch has no items to duplicate |
+| `401 Unauthorized` | `businessId` header missing, or credentials invalid |
+| `404 Not Found` | No bulk transfer with this ID exists for your client and business |
+| `409 Conflict` | Source batch is currently `processing` and can't be duplicated |
+| `409 Conflict` | `batchName` already matches an existing batch for your business |
+
+See [Errors](/essentials/errors) for the full envelope and error code reference.

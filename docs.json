@@ -96,6 +96,7 @@
               "api-reference/bulk-transfers/delete",
               "api-reference/bulk-transfers/get",
               "api-reference/bulk-transfers/list",
+              "api-reference/bulk-transfers/duplicate",
               "api-reference/bulk-transfers/reprocess",
               "api-reference/bulk-transfers/reprocess-logs"
             ]

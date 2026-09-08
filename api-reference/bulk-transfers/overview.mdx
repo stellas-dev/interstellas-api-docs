@@ -27,6 +27,9 @@ This page explains the concepts that apply across every bulk transfer endpoint. 
   <Card title="List bulk transfers" icon="list" href="/api-reference/bulk-transfers/list">
     Retrieve every batch for your business.
   </Card>
+  <Card title="Duplicate" icon="copy" href="/api-reference/bulk-transfers/duplicate">
+    Create a new batch from an existing one's transfers.
+  </Card>
   <Card title="Reprocess" icon="arrow-rotate-right" href="/api-reference/bulk-transfers/reprocess">
     Retry a failed batch, or specific failed items.
   </Card>
@@ -87,6 +90,10 @@ This page explains the concepts that apply across every bulk transfer endpoint. 
 
 - **`batchName`** must be unique per business. Submitting the same `batchName` twice returns `409 Conflict` rather than creating a duplicate batch — use this to safely retry a batch *creation* request without double-submitting if your client times out.
 - **`retrievalReference`** on each transfer must be unique across your business's transfer history, not just within the batch. Reusing one — even from a previous batch — is rejected.
+
+## Duplicating a batch
+
+Rather than resubmitting the same transfers from scratch, you can [duplicate](/api-reference/bulk-transfers/duplicate) any existing batch — regardless of its status — into a new `pending` batch with a fresh `bulkReference` and fresh, unique `retrievalReference`s for every item. Items that had already resolved a recipient name keep it; everything else (status, transaction references, retry counters) resets, and the source batch itself is left completely untouched.
 
 ## Reprocessing in depth
 
