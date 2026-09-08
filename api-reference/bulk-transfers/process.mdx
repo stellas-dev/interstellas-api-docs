@@ -1,0 +1,174 @@
+---
+title: "Process a bulk transfer"
+description: "Start background processing for a batch's pending items."
+---
+
+Batches are **not** processed automatically the moment you create them. After [creating a bulk transfer](/api-reference/bulk-transfers/create), call this endpoint with the `bulkTransferId` to start execution. It queues every item still in `pending` status for background processing and returns immediately.
+
+<Info>
+  This endpoint is safe to call more than once for the same batch. Only the first call actually claims the batch and enqueues it; any call that arrives while the batch is already `processing` is a no-op — it returns `200` rather than queuing a second time (see Response below). Once the batch is `completed`, further calls are rejected outright. Use [Reprocess](/api-reference/bulk-transfers/reprocess) to retry `failed` items instead — this endpoint never touches items that aren't `pending`.
+</Info>
+
+## Endpoint
+
+```
+POST /clients/business/customers/funds/bulk-transfer/process
+```
+
+## Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID. The batch must belong to this business and to the client identified by your API key — see the ownership note under Errors below.
+</ParamField>
+
+## Request body
+
+<ParamField body="bulkTransferId" type="string" required>
+  The ID of the batch to process, returned by [Create a bulk transfer](/api-reference/bulk-transfers/create).
+</ParamField>
+
+## Response
+
+There are two possible successful outcomes, distinguished by HTTP status:
+
+### Queued (first call)
+
+<ResponseField name="status" type="boolean">
+  `true`.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  `"Bulk transfer queued for processing"`.
+</ResponseField>
+
+<ResponseField name="data.bulkTransferId" type="string">
+  The batch that was queued.
+</ResponseField>
+
+<ResponseField name="data.jobId" type="string">
+  Internal identifier for the background processing job. Not required for polling — use [Get a bulk transfer](/api-reference/bulk-transfers/get) to track progress instead.
+</ResponseField>
+
+Before queuing, this endpoint checks that your business account has enough available balance to cover the sum of all currently-`pending` items. If it doesn't, nothing is queued and the request fails — see Errors below. If the check passes, the batch's `status` flips to `processing` immediately, and this response returns `202`.
+
+### Already in progress (duplicate call)
+
+<ResponseField name="status" type="boolean">
+  `true`.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  `"Bulk transfer is already being processed"`.
+</ResponseField>
+
+<ResponseField name="data.bulkTransferId" type="string">
+  The batch you asked to process.
+</ResponseField>
+
+If the batch is already `processing` at the moment this request arrives — for example, a retried request, or a genuinely concurrent call — nothing is re-queued and no balance check runs again. This response returns `200`, and `data` has no `jobId` since no new job was created.
+
+## Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/process \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
+  -H "businessId: YOUR_BUSINESS_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bulkTransferId": "6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f"
+  }'
+```
+
+```js Node.js
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/process",
+  {
+    method: "POST",
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      bulkTransferId: "6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+    }),
+  }
+);
+const { data } = await res.json();
+```
+
+```python Python
+import requests
+
+res = requests.post(
+    "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/process",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+        "businessId": "YOUR_BUSINESS_ID",
+    },
+    json={"bulkTransferId": "6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f"},
+)
+print(res.json())
+```
+</CodeGroup>
+
+## Example responses
+
+`202` — first call, newly queued:
+
+```json
+{
+  "status": true,
+  "message": "Bulk transfer queued for processing",
+  "data": {
+    "bulkTransferId": "6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+    "jobId": "42"
+  }
+}
+```
+
+`200` — duplicate call, already in progress:
+
+```json
+{
+  "status": true,
+  "message": "Bulk transfer is already being processed",
+  "data": {
+    "bulkTransferId": "6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f"
+  }
+}
+```
+
+## Errors
+
+| Status | Cause |
+|---|---|
+| `400 Bad Request` | `businessId` header missing (`"businessId is required in headers"`) |
+| `400 Bad Request` | `bulkTransferId` missing or not a valid UUID |
+| `400 Bad Request` | `"Bulk transfer is already completed"` |
+| `400 Bad Request` | `"No payment account for this business"` |
+| `400 Bad Request` | `"Insufficient Funds"` — your account can't cover the total of all pending items |
+| `401 Unauthorized` | Credentials missing or invalid |
+| `404 Not Found` | No bulk transfer with this ID exists for your client and business |
+
+<Info>
+  The batch is looked up scoped to your API key's client and the `businessId` you send, the same as [Get a bulk transfer](/api-reference/bulk-transfers/get) and [Reprocess](/api-reference/bulk-transfers/reprocess) — a `bulkTransferId` that exists but belongs to a different business returns `404`, not the batch.
+</Info>
+
+<Warning>
+  If the request fails for any reason *after* the batch has been claimed (`"No payment account for this business"`, `"Insufficient Funds"`, or an unexpected error), the batch's `status` is set to `failed` with `failureReason` set to the error message, rather than being left stuck in `processing`. Check [Get a bulk transfer](/api-reference/bulk-transfers/get) for `failureReason` if a batch ends up `failed` without any items ever having started.
+</Warning>
+
+See [Errors](/essentials/errors) for the full envelope and error code reference.

@@ -11,12 +11,12 @@ GET /clients/business/payouts
 
 ## Headers
 
-<ParamField header="Authorization" type="string" required>
-  `Bearer YOUR_ACCESS_TOKEN`
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
 </ParamField>
 
-<ParamField header="SECRET_KEY" type="string" required>
-  Your API secret key.
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
 </ParamField>
 
 <ParamField header="businessId" type="string" required>
@@ -70,8 +70,8 @@ GET /clients/business/payouts
 <CodeGroup>
 ```bash cURL
 curl -X GET https://stella-thirdparty-api.herokuapp.com/api/v1/clients/business/payouts \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -H "SECRET_KEY: YOUR_SECRET_KEY" \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
   -H "businessId: YOUR_BUSINESS_ID"
 ```
 
@@ -80,8 +80,8 @@ const res = await fetch(
   "https://stella-thirdparty-api.herokuapp.com/api/v1/clients/business/payouts",
   {
     headers: {
-      Authorization: "Bearer YOUR_ACCESS_TOKEN",
-      SECRET_KEY: "YOUR_SECRET_KEY",
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
       businessId: "YOUR_BUSINESS_ID",
     },
   }
@@ -95,8 +95,8 @@ import requests
 res = requests.get(
     "https://stella-thirdparty-api.herokuapp.com/api/v1/clients/business/payouts",
     headers={
-        "Authorization": "Bearer YOUR_ACCESS_TOKEN",
-        "SECRET_KEY": "YOUR_SECRET_KEY",
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
         "businessId": "YOUR_BUSINESS_ID",
     },
 )

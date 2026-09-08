@@ -1,0 +1,546 @@
+---
+title: "Upload bulk transfer via Excel"
+description: "Create a batch by uploading a spreadsheet instead of sending a JSON transfers array."
+---
+
+<Info>
+  New to bulk transfer? Read the [overview](/api-reference/bulk-transfers/overview) first.
+</Info>
+
+As an alternative to [Create a bulk transfer](/api-reference/bulk-transfers/create) with a JSON `transfers` array, you can upload an Excel spreadsheet instead. This flow has a few more steps than the JSON path, because recipient bank details in a spreadsheet haven't been verified yet:
+
+1. **Upload** the file — Interstellas parses it, creates the batch and its items, and kicks off recipient name verification in the background.
+2. **Poll the preview** to see which rows resolved to a real account name and which didn't.
+3. **Fix any rows that failed** verification, one at a time.
+4. **Start processing**, same as any other batch — see [Process a bulk transfer](/api-reference/bulk-transfers/process).
+
+## Download the template
+
+<Card title="Interstellas Excel bulk upload template" icon="file-spreadsheet" href="https://test-sandbox-api.stellas.africa/api/v1/public/interstellas-bulk-transfer-template.xlsx">
+  Download the .xlsx template — start every upload from this file.
+</Card>
+
+<Warning>
+  Use this exact template rather than building your own spreadsheet from scratch. Fill in your data under the existing headers, in the existing `Sheet1`, and upload it as-is — don't rename the sheet, reorder/rename the header row, or save it out as a different file type. Anything else risks hitting the parsing errors described below.
+</Warning>
+
+The template also includes a hidden **Bank List** sheet listing every bank name Interstellas recognizes — unhide it in Excel if you need to check the exact spelling of a bank name before filling in the `Bank` column. Leave that sheet in place when you upload; only `Sheet1` is read.
+
+## Excel file format
+
+The template above already matches this format — this section is a reference for what it contains, not a spec to build your own file against.
+
+<Warning>
+  The sheet must be named exactly **`Sheet1`**. Files in any other format, or missing this sheet, are rejected.
+</Warning>
+
+- File type: `.xlsx` or `.xls`, up to 5 MB.
+- Row 1 must be a header row. Column order doesn't matter, but the header text does — matched case-insensitively:
+
+| Header | Maps to | Required |
+|---|---|---|
+| `Bank` | Recipient's bank name | Yes |
+| `Account Number` | Recipient's account number | Yes |
+| `Amount` | Amount in kobo | Yes |
+| `Narration` | Transfer narration | No |
+
+- **Bank** must exactly match a recognized bank name (case-insensitive) — not a bank code. Use the **Bank List** sheet in the template to confirm valid spelling. An unrecognized name fails the whole upload; see Errors below.
+- **Account Number** — if Excel has converted your account numbers to plain numbers and dropped leading zeros, that's fine: numbers are re-padded to 10 digits automatically.
+- **Amount** accepts `₦` and `,` characters and strips them (e.g. `₦5,000` and `5000` both parse fine) — but the underlying value must still be **kobo**, matching every other endpoint in this API. It must be a positive number.
+- Completely blank rows (every cell empty) are silently skipped rather than treated as errors.
+
+## Upload
+
+### Endpoint
+
+```
+POST /clients/business/customers/funds/bulk-transfer/upload
+```
+
+Send as `multipart/form-data`.
+
+### Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID.
+</ParamField>
+
+### Form fields
+
+<ParamField body="file" type="file" required>
+  The filled-in [Interstellas Excel bulk upload template](https://test-sandbox-api.stellas.africa/api/v1/public/interstellas-bulk-transfer-template.xlsx), matching the format above.
+</ParamField>
+
+<ParamField body="batchName" type="string" required>
+  A name for this batch, up to 255 characters. Must be unique among your business's bulk transfers, same as [Create a bulk transfer](/api-reference/bulk-transfers/create).
+</ParamField>
+
+### Response
+
+<ResponseField name="status" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  `"Bulk transfer batch accepted"`.
+</ResponseField>
+
+<ResponseField name="data.bulkTransferId" type="string">
+  Unique ID for this batch. Use this to poll the preview and to process the batch once you're ready.
+</ResponseField>
+
+<ResponseField name="data.bulkReference" type="string">
+  A human-readable reference for this batch.
+</ResponseField>
+
+<ResponseField name="data.totalItems" type="integer">
+  The number of rows accepted from the spreadsheet.
+</ResponseField>
+
+<ResponseField name="data.status" type="string">
+  Always `"pending"` in this response — recipient name verification hasn't finished yet.
+</ResponseField>
+
+<ResponseField name="data.message" type="string">
+  `"Batch received. Recipient name verification is in progress."` — a human-readable nudge to go poll the preview endpoint next.
+</ResponseField>
+
+### Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/upload \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
+  -H "businessId: YOUR_BUSINESS_ID" \
+  -F "file=@payroll.xlsx" \
+  -F "batchName=July salaries"
+```
+
+```js Node.js
+const form = new FormData();
+form.append("file", fs.createReadStream("payroll.xlsx"));
+form.append("batchName", "July salaries");
+
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/upload",
+  {
+    method: "POST",
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+      ...form.getHeaders(),
+    },
+    body: form,
+  }
+);
+const { data } = await res.json();
+const bulkTransferId = data.bulkTransferId;
+```
+
+```python Python
+import requests
+
+with open("payroll.xlsx", "rb") as f:
+    res = requests.post(
+        "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/upload",
+        headers={
+            "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+            "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+            "businessId": "YOUR_BUSINESS_ID",
+        },
+        files={"file": f},
+        data={"batchName": "July salaries"},
+    )
+print(res.json())
+```
+</CodeGroup>
+
+### Example response
+
+```json
+{
+  "status": true,
+  "message": "Bulk transfer batch accepted",
+  "data": {
+    "bulkTransferId": "6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+    "bulkReference": "BULK-a1b2c3d4e5f6g7h8i9j0",
+    "totalItems": 2,
+    "status": "pending",
+    "message": "Batch received. Recipient name verification is in progress."
+  }
+}
+```
+
+### Errors
+
+| Status | Cause |
+|---|---|
+| `400 Bad Request` | No file uploaded, or `batchName` missing |
+| `400 Bad Request` | Wrong file type — only `.xlsx`/`.xls` are accepted |
+| `400 Bad Request` | File is larger than 5 MB |
+| `400 Bad Request` | `"Sheet1" not found in workbook`, or the file has no data rows |
+| `400 Bad Request` | One or more rows are missing a bank name, account number, or a valid positive amount — the message lists every offending row |
+| `400 Bad Request` | One or more bank names couldn't be matched to a known bank — the message lists which rows and names |
+| `400 Bad Request` | More than 5,000 valid rows in the file |
+| `409 Conflict` | `batchName` already exists for this business |
+| `401 Unauthorized` | `businessId` header missing, or credentials invalid |
+
+<Info>
+  Validation is all-or-nothing: if *any* row has a bad amount, missing account number, or unrecognized bank name, the entire upload is rejected and no batch is created. Fix the spreadsheet and re-upload.
+</Info>
+
+## Preview
+
+Poll this to check the status of recipient name verification after uploading.
+
+### Endpoint
+
+```
+GET /clients/business/customers/funds/bulk-transfer/upload/preview/{bulkTransferId}
+```
+
+### Path parameters
+
+<ParamField path="bulkTransferId" type="string" required>
+  The ID returned from the upload response.
+</ParamField>
+
+### Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID.
+</ParamField>
+
+### Response
+
+<ResponseField name="data.status" type="string">
+  `"pending"` while verification is still running, `"enquiry_complete"` once every row has been checked. This is a distinct value from the [batch statuses](/api-reference/bulk-transfers/overview#statuses) used elsewhere — it only applies to uploaded batches before you start processing.
+</ResponseField>
+
+<ResponseField name="data.totalAmount" type="string">
+  Sum of every row's `amount`, in kobo.
+</ResponseField>
+
+<ResponseField name="data.resolvedItems" type="integer">
+  Number of rows whose recipient name was successfully verified.
+</ResponseField>
+
+<ResponseField name="data.failedItems" type="integer">
+  Number of rows whose recipient name **could not** be verified.
+</ResponseField>
+
+<ResponseField name="data.pendingItems" type="integer">
+  Number of rows still being checked. Poll again until this reaches `0`.
+</ResponseField>
+
+<ResponseField name="data.items" type="array">
+  Every row from the spreadsheet, in order.
+</ResponseField>
+
+<ResponseField name="data.items[].id" type="string">
+  The item's ID — use this with [Edit an item](#edit-an-item) below.
+</ResponseField>
+
+<ResponseField name="data.items[].receiverAccountNumber" type="string">
+  The account number for this row.
+</ResponseField>
+
+<ResponseField name="data.items[].receiverBankName" type="string">
+  The bank name for this row, as resolved back from the bank code Interstellas matched it to.
+</ResponseField>
+
+<ResponseField name="data.items[].amount" type="string">
+  The amount for this row, in kobo.
+</ResponseField>
+
+<ResponseField name="data.items[].recipientName" type="string">
+  The verified account holder name, once resolved. `null` until then, or if verification failed.
+</ResponseField>
+
+<ResponseField name="data.items[].nameEnquiryStatus" type="string">
+  `pending`, `resolved`, or `failed`.
+</ResponseField>
+
+<ResponseField name="data.items[].nameEnquiryError" type="string">
+  Why verification failed, if it did. `null` otherwise.
+</ResponseField>
+
+<Warning>
+  `data.completedItems` and `data.failedItems` at the top level of this response (inherited from the batch record's own fields) currently mean **name-enquiry outcomes**, not transfer outcomes — they're set to the same counts as `resolvedItems`/`failedItems` while the batch is `pending`/`enquiry_complete`. Once you call [Process a bulk transfer](/api-reference/bulk-transfers/process) and items actually start moving money, these same field names on [Get a bulk transfer](/api-reference/bulk-transfers/get) switch to meaning completed/failed *transfers*. Prefer `resolvedItems`/`failedItems`/`pendingItems` on this endpoint specifically, since their names aren't ambiguous.
+</Warning>
+
+### Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X GET https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/upload/preview/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
+  -H "businessId: YOUR_BUSINESS_ID"
+```
+
+```js Node.js
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/upload/preview/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+  {
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+    },
+  }
+);
+const { data } = await res.json();
+```
+
+```python Python
+import requests
+
+res = requests.get(
+    "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/upload/preview/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+        "businessId": "YOUR_BUSINESS_ID",
+    },
+)
+print(res.json())
+```
+</CodeGroup>
+
+### Example response
+
+```json
+{
+  "status": true,
+  "message": "Bulk transfer preview retrieved",
+  "data": {
+    "id": "6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+    "bulkReference": "BULK-a1b2c3d4e5f6g7h8i9j0",
+    "batchName": "July salaries",
+    "totalItems": 2,
+    "status": "enquiry_complete",
+    "totalAmount": "300000",
+    "resolvedItems": 1,
+    "failedItems": 1,
+    "pendingItems": 0,
+    "items": [
+      {
+        "id": "a1b2c3d4-0000-4a8d-9e2f-000000000001",
+        "itemIndex": 0,
+        "receiverAccountNumber": "1234567890",
+        "receiverBankCode": "058",
+        "receiverBankName": "GTBank",
+        "amount": "100000",
+        "narration": "July salary",
+        "recipientName": "Ada Lovelace",
+        "nameEnquiryStatus": "resolved",
+        "nameEnquiryError": null,
+        "status": "pending"
+      },
+      {
+        "id": "a1b2c3d4-0000-4a8d-9e2f-000000000002",
+        "itemIndex": 1,
+        "receiverAccountNumber": "0000000000",
+        "receiverBankCode": "058",
+        "receiverBankName": "GTBank",
+        "amount": "200000",
+        "narration": "July salary",
+        "recipientName": null,
+        "nameEnquiryStatus": "failed",
+        "nameEnquiryError": "Unable to resolve account name",
+        "status": "pending"
+      }
+    ]
+  }
+}
+```
+
+### Errors
+
+| Status | Cause |
+|---|---|
+| `400 Bad Request` | `businessId` header missing |
+| `404 Not Found` | No bulk transfer with this ID exists for your client and business |
+| `401 Unauthorized` | Credentials invalid |
+
+## Edit an item
+
+Fix a row before processing — most commonly used to correct a row whose `nameEnquiryStatus` came back `failed`. Don't want to fix it, just remove it? See [Delete an item](/api-reference/bulk-transfers/delete#delete-an-item) instead.
+
+<Warning>
+  This only works while the batch's `status` is `pending` or `enquiry_complete`. Once you've called [Process a bulk transfer](/api-reference/bulk-transfers/process), items can no longer be edited this way.
+</Warning>
+
+<Info>
+  Nothing about this endpoint is actually specific to uploaded batches — the same `pending`/`enquiry_complete` window applies to batches created via [JSON](/api-reference/bulk-transfers/create) too, which only ever reach `pending` (not `enquiry_complete`, since there's no name-enquiry step for JSON submissions). It's documented here because fixing a failed name-enquiry row is the main reason you'd use it.
+</Info>
+
+### Endpoint
+
+```
+PATCH /clients/business/customers/funds/bulk-transfer/{bulkTransferId}/items/{itemId}
+```
+
+### Path parameters
+
+<ParamField path="bulkTransferId" type="string" required>
+  The batch the item belongs to.
+</ParamField>
+
+<ParamField path="itemId" type="string" required>
+  The item's `id`, from the preview response.
+</ParamField>
+
+### Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID.
+</ParamField>
+
+### Request body
+
+At least one of the following is required.
+
+<ParamField body="receiverAccountNumber" type="string">
+  Corrected account number.
+</ParamField>
+
+<ParamField body="receiverBankName" type="string">
+  Corrected bank name — same matching rules as the [Excel file format](#excel-file-format) above (exact name match, case-insensitive).
+</ParamField>
+
+<ParamField body="amount" type="string">
+  Corrected amount, in kobo.
+</ParamField>
+
+<ParamField body="narration" type="string">
+  Corrected narration.
+</ParamField>
+
+<Info>
+  Changing `receiverAccountNumber` or `receiverBankName` automatically re-runs name verification for this item before responding — the item's `nameEnquiryStatus`, `recipientName`, and `nameEnquiryError` in the response already reflect the new lookup. Changing only `amount` or `narration` does not trigger a re-check.
+</Info>
+
+### Response
+
+Returns the full updated item — the same shape as an entry in the preview endpoint's `items` array, plus a few internal bookkeeping fields (`transactionReference`, `reprocessCount`, etc. — all still `null`/`0` at this stage since nothing has been processed yet).
+
+### Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X PATCH https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f/items/a1b2c3d4-0000-4a8d-9e2f-000000000002 \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
+  -H "businessId: YOUR_BUSINESS_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "receiverAccountNumber": "1234567891"
+  }'
+```
+
+```js Node.js
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f/items/a1b2c3d4-0000-4a8d-9e2f-000000000002",
+  {
+    method: "PATCH",
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ receiverAccountNumber: "1234567891" }),
+  }
+);
+const { data } = await res.json();
+```
+
+```python Python
+import requests
+
+res = requests.patch(
+    "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f/items/a1b2c3d4-0000-4a8d-9e2f-000000000002",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+        "businessId": "YOUR_BUSINESS_ID",
+    },
+    json={"receiverAccountNumber": "1234567891"},
+)
+print(res.json())
+```
+</CodeGroup>
+
+### Example response
+
+```json
+{
+  "status": true,
+  "message": "Bulk transfer item updated",
+  "data": {
+    "id": "a1b2c3d4-0000-4a8d-9e2f-000000000002",
+    "bulkTransferId": "6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+    "itemIndex": 1,
+    "amount": "200000",
+    "receiverAccountNumber": "1234567891",
+    "receiverBankCode": "058",
+    "narration": "July salary",
+    "recipientName": "Grace Hopper",
+    "nameEnquiryStatus": "resolved",
+    "nameEnquiryError": null,
+    "status": "pending"
+  }
+}
+```
+
+### Errors
+
+| Status | Cause |
+|---|---|
+| `400 Bad Request` | No fields provided to update |
+| `400 Bad Request` | `receiverBankName` couldn't be matched to a known bank |
+| `404 Not Found` | Batch or item not found for your client and business |
+| `409 Conflict` | Batch `status` is no longer `pending` or `enquiry_complete` — processing has already started |
+| `401 Unauthorized` | `businessId` header missing, or credentials invalid |
+
+See [Errors](/essentials/errors) for the full envelope and error code reference.
+
+## Ready to process
+
+Once every row you care about shows `nameEnquiryStatus: "resolved"`, start the batch the same way as any other bulk transfer:
+
+<Card title="Process a bulk transfer" icon="play" href="/api-reference/bulk-transfers/process">
+  Start executing the transfers in this batch.
+</Card>
+
+<Warning>
+  Rows still `failed` at this point aren't blocked from processing — Interstellas doesn't check `nameEnquiryStatus` before attempting a transfer. An unresolved row will most likely fail again during processing, for the same reason it failed name verification, but it's not guaranteed to be excluded automatically. Fix or remove anything you don't want attempted before calling process.
+</Warning>

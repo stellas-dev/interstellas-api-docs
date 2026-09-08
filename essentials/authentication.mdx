@@ -1,58 +1,60 @@
 ---
 title: "Authentication deep dive"
-description: "A complete reference for Interstellas API credentials — what each one is, where to find it, and how all three work together."
+description: "A complete reference for Interstellas API credentials — what each one is, where to find it, and how they work together."
 ---
 
-Interstellas uses three separate credentials that work together on every authenticated request. Understanding what each one is prevents the most common integration errors.
+Interstellas requests are authenticated with three headers that work together on every request. Understanding what each one is prevents the most common integration errors.
 
 ## Credential types
 
-### Access token
+### API key
 
-The access token is a JWT issued by `POST /auth/signin`. It identifies the authenticated user session.
+The API key is the public identifier for your API client. It's safe to reference in logs and internal tooling, but should still be treated as sensitive since it's one half of your credential pair.
 
-- **How to get it:** Call `POST /auth/signin` with your email and password.
-- **Where to send it:** `Authorization: Bearer <token>` header.
-- **Lifetime:** Session-scoped. Re-authenticate when it expires.
+- **How to get it:** Dashboard → **Settings → API Keys**.
+- **Where to send it:** `x-api-key: <key>` header.
+- **Format:** `stl_` followed by 32 hexadecimal characters.
 
-### Secret key
+### API secret
 
-The secret key is a static credential tied to your Interstellas account. It acts as a second authentication factor on server-to-server requests.
+The API secret is the private credential paired with your API key. Its prefix determines whether a request is treated as sandbox or production traffic.
 
-- **How to get it:** Dashboard → **Settings → API Keys**, or via [`GET /clients/settings/get-keys`](/api-reference/settings/get-keys).
-- **Where to send it:** `SECRET_KEY: <key>` header.
-- **Lifetime:** Static until you rotate it manually.
+- **How to get it:** Dashboard → **Settings → API Keys**. Shown once, at creation or regeneration time — it cannot be retrieved afterward.
+- **Where to send it:** `x-api-secret: <secret>` header.
+- **Format:** `stl_test_` or `stl_live_` followed by 64 hexadecimal characters.
 
 ### Business ID
 
 The business ID scopes each request to a specific registered business under your account. A single client account can own multiple businesses, and most endpoints require you to specify which business you are operating on.
 
-- **How to get it:** Returned in the `businesses` array from `POST /auth/signin`.
+- **How to get it:** Returned when you create a business via [`POST /clients/business`](/api-reference/business/create), or from [`GET /clients/business`](/api-reference/business/list).
 - **Where to send it:** `businessId: <id>` header.
 
-## Using all three together
+## Using them together
 
 ```http
 POST /api/v1/clients/business/virtual-accounts
-Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
-SECRET_KEY: sk_live_abc123xyz
+x-api-key: stl_c8e286ca55b0123e0b05da047494f585
+x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0
 businessId: biz_xyz789
 Content-Type: application/json
 ```
 
 <Warning>
-  If any of the three credentials is missing or invalid, the request fails with `401 Unauthorized`.
+  If `x-api-key` or `x-api-secret` is missing or invalid, the request fails with `401 Unauthorized`. Do not additionally send an `Authorization: Bearer` header — that combination is rejected.
 </Warning>
 
 ## Sandbox vs. production
 
-Use sandbox credentials against the sandbox base URL during development. Sandbox and production credentials are separate — never mix them.
+Use sandbox credentials (`stl_test_...`) against the sandbox base URL during development. Use production credentials (`stl_live_...`) only against the production base URL. Sandbox and production credentials are fully isolated — separate rate-limit budgets, separate data — and can't be mixed.
 
 | Environment | Base URL |
 |-------------|----------|
 | Sandbox | `https://sandbox.stellasbank.com/api/v1` |
 | Production | `https://interstellas-api.stellasbank.com/api/v1` |
 
-## Rotating your secret key
+## Rotating and revoking keys
 
-Generate a new key from **Settings → API Keys** in the dashboard. Update your application's environment variable before deactivating the old key to avoid downtime.
+Generate a new secret from **Settings → API Keys** in the dashboard — the new value is shown once, so store it immediately. Update your application's environment variable before revoking the old key to avoid downtime. Revocation takes effect within about 60 seconds.
+
+See [Authentication](/authentication) for scopes, rate limits, and the full error reference.

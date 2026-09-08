@@ -7,13 +7,18 @@ The Interstellas API uses the `status` field in the response envelope to signal 
 
 ## Error response format
 
-All error responses follow the same envelope as successful ones:
+Error responses look like this:
 
 ```json
 {
   "status": false,
-  "message": "Invalid credentials.",
-  "data": null
+  "message": "Validation failed",
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "details": [
+      { "field": "email", "message": "must be a valid email" }
+    ]
+  }
 }
 ```
 
@@ -22,12 +27,36 @@ All error responses follow the same envelope as successful ones:
 </ResponseField>
 
 <ResponseField name="message" type="string">
-  A human-readable description of what went wrong. Use this for logging and debugging — do not drive conditional logic in your application from this string.
+  A human-readable description of what went wrong. Use this for logging and debugging.
 </ResponseField>
 
-<ResponseField name="data" type="null">
-  `null` on all error responses.
+<ResponseField name="error.code" type="string">
+  A stable, machine-readable code identifying the error type. **Branch your error handling on this field, not on `message`** — `message` text may change, `error.code` won't. See the table below for every value.
 </ResponseField>
+
+<ResponseField name="error.details" type="array">
+  Field-level validation errors, each with a `field` and `message`. Only present when the error is caused by one or more invalid request fields — omitted entirely otherwise (not `null`, not `[]`).
+</ResponseField>
+
+<Info>
+  Error responses have no `data` field at all — not even `data: null`. Only success responses include `data`.
+</Info>
+
+## Error codes
+
+| HTTP status | `error.code` | Meaning |
+|---|---|---|
+| 400 | `BAD_REQUEST` | Malformed or invalid request |
+| 400 | `VALIDATION_ERROR` | One or more request fields failed validation — see `error.details` |
+| 400 | `BUSINESS_REGISTRATION_ERROR` | Business registration request was rejected |
+| 400 | `FILE_UPLOAD_ERROR` | File upload failed or was rejected |
+| 401 | `AUTHENTICATION_ERROR` | Request could not be authenticated |
+| 403 | `FORBIDDEN` | Authenticated, but not permitted to access this resource |
+| 404 | `NOT_FOUND` | Resource does not exist |
+| 409 | `CONFLICT` | Request conflicts with the current state of the resource |
+| 422 | `UNPROCESSABLE_ENTITY` | Request was well-formed but semantically invalid |
+| 429 | `RATE_LIMIT_EXCEEDED` | Too many requests — see [Rate limits](/authentication#rate-limits) |
+| 500 | `INTERNAL_SERVER_ERROR` | Unexpected server error — safe to retry with backoff |
 
 ## HTTP status codes
 
@@ -36,11 +65,29 @@ All error responses follow the same envelope as successful ones:
 | `200 OK` | Request succeeded | — |
 | `201 Created` | Resource created | — |
 | `400 Bad Request` | Invalid or missing parameters | Required field absent or wrong type |
-| `401 Unauthorized` | Authentication failed | Missing, expired, or invalid `Authorization` token or `SECRET_KEY` |
-| `403 Forbidden` | Insufficient permissions | Token valid but lacks access to this resource |
+| `401 Unauthorized` | Authentication failed | Missing or invalid `x-api-key` / `x-api-secret`, or a revoked key |
+| `403 Forbidden` | Insufficient permissions | Credentials valid but not permitted for this resource |
 | `404 Not Found` | Resource does not exist | Invalid ID in the URL path |
+| `409 Conflict` | Conflicting state | e.g. resource already exists or already in a terminal state |
 | `422 Unprocessable Entity` | Validation error | Field value failed server-side validation |
+| `429 Too Many Requests` | Rate limit exceeded | Too many requests from this API client within the current window |
 | `500 Internal Server Error` | Unexpected server error | Retry with exponential backoff |
+
+### Rate limit responses
+
+A `429` response includes a `Retry-After` header — the number of seconds to wait before retrying:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 60
+Content-Type: application/json
+
+{
+  "status": false,
+  "message": "Rate limit exceeded",
+  "error": { "code": "RATE_LIMIT_EXCEEDED" }
+}
+```
 
 ## Handling errors in code
 
@@ -50,8 +97,8 @@ const res = await fetch("https://sandbox.stellasbank.com/api/v1/...", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    Authorization: "Bearer YOUR_ACCESS_TOKEN",
-    SECRET_KEY: "YOUR_SECRET_KEY",
+    "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+    "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
     businessId: "YOUR_BUSINESS_ID",
   },
   body: JSON.stringify({ /* request body */ }),
@@ -60,7 +107,7 @@ const res = await fetch("https://sandbox.stellasbank.com/api/v1/...", {
 const json = await res.json();
 
 if (!json.status) {
-  console.error("API error:", json.message);
+  console.error("API error:", json.error?.code, json.message);
   return;
 }
 
@@ -73,8 +120,8 @@ import requests
 res = requests.post(
     "https://sandbox.stellasbank.com/api/v1/...",
     headers={
-        "Authorization": "Bearer YOUR_ACCESS_TOKEN",
-        "SECRET_KEY": "YOUR_SECRET_KEY",
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
         "businessId": "YOUR_BUSINESS_ID",
     },
     json={ # request body },
@@ -82,7 +129,7 @@ res = requests.post(
 
 body = res.json()
 if not body["status"]:
-    print("API error:", body["message"])
+    print("API error:", body.get("error", {}).get("code"), body["message"])
 else:
     print(body["data"])
 ```
@@ -94,11 +141,17 @@ else:
 
 ## Authentication errors
 
-If you receive `401 Unauthorized`, verify that:
+A `401 AUTHENTICATION_ERROR` is returned whenever a request can't be authenticated. The `message` falls into one of two buckets:
 
-1. The `Authorization` header is present and formatted as `Bearer YOUR_ACCESS_TOKEN`.
-2. The `SECRET_KEY` header is present and matches your account's secret key.
-3. The `businessId` header is present and valid.
-4. Your access token has not expired — re-authenticate via [`POST /auth/signin`](/api-reference/auth/signin) if needed.
+- **`"Unauthorized"`** — the request is missing `x-api-key` and/or `x-api-secret` entirely, or combines them with an `Authorization: Bearer` header (that combination is rejected).
+- **`"Invalid credentials"`** — both headers were sent, but the API key isn't recognized, the secret doesn't match, or the key has been revoked.
 
-See [Authentication](/essentials/authentication) for a full credential reference.
+Neither message enumerates further — you can't tell from the response alone which specific credential was wrong, which is intentional. If you receive a `401`, check that:
+
+1. Both `x-api-key` and `x-api-secret` are present, exactly as issued (no truncation or extra whitespace).
+2. You are not also sending an `Authorization: Bearer` header alongside them.
+3. The key hasn't been revoked or replaced by a regenerated secret — see [Authentication](/authentication) for rotation and revocation timing.
+
+A `403 FORBIDDEN` means the credentials themselves are valid but aren't permitted for the resource requested.
+
+See [Authentication](/authentication) for the full credential reference, including rate limits.

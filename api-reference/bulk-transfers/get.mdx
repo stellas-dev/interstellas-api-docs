@@ -1,0 +1,245 @@
+---
+title: "Get a bulk transfer"
+description: "Retrieve a batch's status and every transfer item inside it."
+---
+
+Use this endpoint to poll a batch after creating it, or to inspect the outcome of a reprocess attempt. It returns the full batch record plus every item, each with its own status.
+
+## Endpoint
+
+```
+GET /clients/business/customers/funds/bulk-transfer/{bulkTransferId}
+```
+
+## Path parameters
+
+<ParamField path="bulkTransferId" type="string" required>
+  The `bulkTransferId` returned when you [created the batch](/api-reference/bulk-transfers/create).
+</ParamField>
+
+## Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID.
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable outcome.
+</ResponseField>
+
+<ResponseField name="data.id" type="string">
+  The bulk transfer ID (same as `bulkTransferId`).
+</ResponseField>
+
+<ResponseField name="data.bulkReference" type="string">
+  Human-readable reference for this batch.
+</ResponseField>
+
+<ResponseField name="data.businessId" type="string">
+  The business this batch belongs to.
+</ResponseField>
+
+<ResponseField name="data.batchName" type="string">
+  The name you gave this batch on creation.
+</ResponseField>
+
+<ResponseField name="data.totalItems" type="integer">
+  Total number of transfers in the batch.
+</ResponseField>
+
+<ResponseField name="data.completedItems" type="integer">
+  Number of items currently in `completed` status.
+</ResponseField>
+
+<ResponseField name="data.failedItems" type="integer">
+  Number of items currently in `failed` status.
+</ResponseField>
+
+<ResponseField name="data.status" type="string">
+  Batch status — `pending`, `processing`, `completed`, `failed`, or `partially_completed`. See [statuses](/api-reference/bulk-transfers/overview#statuses).
+</ResponseField>
+
+<ResponseField name="data.failureReason" type="string">
+  Set when the batch as a whole failed to start — either [processing](/api-reference/bulk-transfers/process) or a batch-level [reprocess](/api-reference/bulk-transfers/reprocess) (e.g. an insufficient-funds check at the batch level, or no payment account found). `null` otherwise — this is distinct from any individual item's `errorMessage`.
+</ResponseField>
+
+<ResponseField name="data.createdAt" type="string">
+  ISO 8601 timestamp of when the batch was created.
+</ResponseField>
+
+<ResponseField name="data.items" type="array">
+  Every transfer in the batch, in the same order you submitted them (`itemIndex` ascending).
+</ResponseField>
+
+<ResponseField name="data.items[].id" type="string">
+  Unique ID for this item. Include it in `itemIds` when [reprocessing items](/api-reference/bulk-transfers/reprocess#reprocess-items).
+</ResponseField>
+
+<ResponseField name="data.items[].itemIndex" type="integer">
+  The item's position (0-based) in the original `transfers` array.
+</ResponseField>
+
+<ResponseField name="data.items[].amount" type="string">
+  Amount for this transfer, in kobo.
+</ResponseField>
+
+<ResponseField name="data.items[].receiverAccountNumber" type="string">
+  Destination account number for this transfer.
+</ResponseField>
+
+<ResponseField name="data.items[].receiverBankCode" type="string">
+  Destination bank code for this transfer.
+</ResponseField>
+
+<ResponseField name="data.items[].retrievalReference" type="string">
+  The reference you supplied for this transfer.
+</ResponseField>
+
+<ResponseField name="data.items[].transactionReference" type="string">
+  The transaction reference currently associated with this item. Changes each time the item is reprocessed — see `originalTransactionReference`.
+</ResponseField>
+
+<ResponseField name="data.items[].originalTransactionReference" type="string">
+  The transaction reference from this item's very first processing attempt. Only present once the item has been reprocessed at least once.
+</ResponseField>
+
+<ResponseField name="data.items[].status" type="string">
+  Item status — `pending`, `processing`, `completed`, or `failed`.
+</ResponseField>
+
+<ResponseField name="data.items[].errorMessage" type="string">
+  Reason the item failed. Empty string if the item hasn't failed.
+</ResponseField>
+
+<ResponseField name="data.items[].errorCode" type="string">
+  Provider- or validation-supplied error code. Not a fixed enum — informational only.
+</ResponseField>
+
+<ResponseField name="data.items[].providerReference" type="string">
+  The banking provider's own reference for this transfer, once processed.
+</ResponseField>
+
+<ResponseField name="data.items[].reprocessCount" type="integer">
+  Number of times this item has been reprocessed.
+</ResponseField>
+
+<ResponseField name="data.items[].processedAt" type="string">
+  ISO 8601 timestamp of when this item last finished processing. `null` if still `pending`.
+</ResponseField>
+
+## Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X GET https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
+  -H "businessId: YOUR_BUSINESS_ID"
+```
+
+```js Node.js
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+  {
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+    },
+  }
+);
+const { data } = await res.json();
+```
+
+```python Python
+import requests
+
+res = requests.get(
+    "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+        "businessId": "YOUR_BUSINESS_ID",
+    },
+)
+print(res.json()["data"])
+```
+</CodeGroup>
+
+## Example response
+
+```json
+{
+  "status": true,
+  "message": "Bulk transfer retrieved successfully",
+  "data": {
+    "id": "6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+    "bulkReference": "BULK-a1b2c3d4e5f6g7h8i9j0",
+    "businessId": "biz_xyz789",
+    "batchName": "July salaries",
+    "totalItems": 2,
+    "completedItems": 1,
+    "failedItems": 1,
+    "status": "partially_completed",
+    "failureReason": null,
+    "createdAt": "2024-07-01T09:00:00.000Z",
+    "items": [
+      {
+        "id": "a1b2c3d4-0000-4a8d-9e2f-000000000001",
+        "itemIndex": 0,
+        "amount": "100000",
+        "receiverAccountNumber": "1234567890",
+        "receiverBankCode": "058",
+        "retrievalReference": "salary_2024_07_001",
+        "transactionReference": "TRX-abc123",
+        "status": "completed",
+        "errorMessage": "",
+        "errorCode": "",
+        "providerReference": "PRV-001",
+        "reprocessCount": 0,
+        "processedAt": "2024-07-01T09:00:05.000Z"
+      },
+      {
+        "id": "a1b2c3d4-0000-4a8d-9e2f-000000000002",
+        "itemIndex": 1,
+        "amount": "200000",
+        "receiverAccountNumber": "0987654321",
+        "receiverBankCode": "058",
+        "retrievalReference": "salary_2024_07_002",
+        "transactionReference": "TRX-def456",
+        "status": "failed",
+        "errorMessage": "Insufficient Funds",
+        "errorCode": "",
+        "providerReference": "",
+        "reprocessCount": 0,
+        "processedAt": "2024-07-01T09:00:06.000Z"
+      }
+    ]
+  }
+}
+```
+
+## Errors
+
+| Status | Cause |
+|---|---|
+| `401 Unauthorized` | `businessId` header missing, or credentials invalid — see [Errors](/essentials/errors) |
+| `404 Not Found` | No bulk transfer with this ID exists for your client and business |
+
+<Info>
+  Unlike [Create a bulk transfer](/api-reference/bulk-transfers/create), a missing `businessId` header on this endpoint returns `401`, not `400`.
+</Info>

@@ -1,0 +1,215 @@
+---
+title: "List bulk transfers"
+description: "Retrieve every bulk transfer batch for your business."
+---
+
+This endpoint returns batch-level summaries only — it does not include each batch's `items`. Use [Get a bulk transfer](/api-reference/bulk-transfers/get) for the full item breakdown of a specific batch.
+
+## Endpoint
+
+```
+GET /clients/business/customers/funds/bulk-transfers
+```
+
+## Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID.
+</ParamField>
+
+## Query parameters
+
+<ParamField query="page" type="integer">
+  Page number. Defaults to `1`.
+</ParamField>
+
+<ParamField query="limit" type="integer">
+  Records per page. Defaults to `20`, capped at `100` — a `limit` above `100` is silently clamped down rather than rejected.
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter to batches with this exact `status` — `pending`, `processing`, `completed`, `failed`, or `partially_completed`.
+</ParamField>
+
+<ParamField query="batchName" type="string">
+  Filter to batches whose `batchName` contains this text. Case-insensitive, partial match.
+</ParamField>
+
+<ParamField query="keyword" type="string">
+  Search across both `batchName` and `bulkReference` for this text. Case-insensitive, partial match. If you also pass `batchName`, both filters apply together.
+</ParamField>
+
+<ParamField query="fromDate" type="string">
+  ISO 8601 date — only include batches created on or after this date.
+</ParamField>
+
+<ParamField query="toDate" type="string">
+  ISO 8601 date — only include batches created on or before this date.
+</ParamField>
+
+See [Pagination](/essentials/pagination) for full usage — this endpoint uses Shape B.
+
+## Response
+
+<ResponseField name="status" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable outcome.
+</ResponseField>
+
+<ResponseField name="data.bulkTransfers" type="array">
+  Array of bulk transfer batches, most recently created first.
+</ResponseField>
+
+<ResponseField name="data.bulkTransfers[].id" type="string">
+  The bulk transfer ID. Use with [Get a bulk transfer](/api-reference/bulk-transfers/get) to retrieve items.
+</ResponseField>
+
+<ResponseField name="data.bulkTransfers[].bulkReference" type="string">
+  Human-readable reference for this batch.
+</ResponseField>
+
+<ResponseField name="data.bulkTransfers[].batchName" type="string">
+  The name given to this batch on creation.
+</ResponseField>
+
+<ResponseField name="data.bulkTransfers[].totalItems" type="integer">
+  Total number of transfers in the batch.
+</ResponseField>
+
+<ResponseField name="data.bulkTransfers[].completedItems" type="integer">
+  Number of items currently `completed`.
+</ResponseField>
+
+<ResponseField name="data.bulkTransfers[].failedItems" type="integer">
+  Number of items currently `failed`.
+</ResponseField>
+
+<ResponseField name="data.bulkTransfers[].totalAmount" type="string">
+  Sum of the `amount` of every item in this batch, in kobo — regardless of each item's individual status. `"0"` if the batch somehow has no items.
+</ResponseField>
+
+<ResponseField name="data.bulkTransfers[].status" type="string">
+  Batch status. See [statuses](/api-reference/bulk-transfers/overview#statuses).
+</ResponseField>
+
+<ResponseField name="data.bulkTransfers[].createdAt" type="string">
+  ISO 8601 timestamp of when the batch was created.
+</ResponseField>
+
+<ResponseField name="pagination.page" type="integer">
+  The current page number.
+</ResponseField>
+
+<ResponseField name="pagination.limit" type="integer">
+  The page size used for this response.
+</ResponseField>
+
+<ResponseField name="pagination.total" type="integer">
+  Total number of batches matching the current query, across all pages.
+</ResponseField>
+
+<ResponseField name="pagination.totalPages" type="integer">
+  The final page number, derived from `total ÷ limit`.
+</ResponseField>
+
+## Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X GET "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfers?page=1&limit=20" \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
+  -H "businessId: YOUR_BUSINESS_ID"
+```
+
+```js Node.js
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfers?page=1&limit=20",
+  {
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+    },
+  }
+);
+const { data, pagination } = await res.json();
+```
+
+```python Python
+import requests
+
+res = requests.get(
+    "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfers",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+        "businessId": "YOUR_BUSINESS_ID",
+    },
+    params={"page": 1, "limit": 20},
+)
+print(res.json())
+```
+</CodeGroup>
+
+## Example response
+
+```json
+{
+  "status": true,
+  "message": "Bulk transfers retrieved successfully",
+  "data": {
+    "bulkTransfers": [
+      {
+        "id": "6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+        "bulkReference": "BULK-a1b2c3d4e5f6g7h8i9j0",
+        "batchName": "July salaries",
+        "totalItems": 2,
+        "completedItems": 1,
+        "failedItems": 1,
+        "totalAmount": "300000",
+        "status": "partially_completed",
+        "createdAt": "2024-07-01T09:00:00.000Z"
+      }
+    ]
+  },
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "totalPages": 1
+  }
+}
+```
+
+## Filtering and search
+
+Combine `status`, `batchName`, `keyword`, and the date range params freely — they all narrow the same result set together. For example, to find `failed` batches from July whose name mentions "salaries":
+
+```bash cURL
+curl -X GET "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfers?status=failed&batchName=salaries&fromDate=2024-07-01&toDate=2024-07-31" \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
+  -H "businessId: YOUR_BUSINESS_ID"
+```
+
+<Info>
+  `status` isn't validated against the list of known statuses — passing a value that doesn't match any batch (a typo, for instance) just returns an empty `bulkTransfers` array rather than a `400`.
+</Info>
+
+## Errors
+
+| Status | Cause |
+|---|---|
+| `401 Unauthorized` | `businessId` header missing, or credentials invalid — see [Errors](/essentials/errors) |

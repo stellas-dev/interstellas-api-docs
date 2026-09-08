@@ -1,0 +1,138 @@
+---
+title: "Get virtual account by ID"
+description: "Retrieve the details of a single virtual account."
+---
+
+## Endpoint
+
+```
+GET /clients/business/virtual-accounts/{id}
+```
+
+## Path parameters
+
+<ParamField path="id" type="string" required>
+  The virtual account's `id`, from [List virtual accounts](/api-reference/virtual-accounts/list) or the account's creation response.
+</ParamField>
+
+## Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID.
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable outcome.
+</ResponseField>
+
+<ResponseField name="data.id" type="string">
+  Unique ID for this virtual account.
+</ResponseField>
+
+<ResponseField name="data.clientRef" type="string">
+  The `reference` (or `refCode`) supplied when this account was created.
+</ResponseField>
+
+<ResponseField name="data.systemRef" type="string">
+  The unique reference Interstellas generated for this account.
+</ResponseField>
+
+<ResponseField name="data.name" type="string">
+  The name on the account.
+</ResponseField>
+
+<ResponseField name="data.accountNumber" type="string">
+  The NUBAN account number.
+</ResponseField>
+
+<ResponseField name="data.bvn" type="string">
+  The BVN associated with this account, if one was set at creation.
+</ResponseField>
+
+<Info>
+  This endpoint returns fewer fields than [List virtual accounts](/api-reference/virtual-accounts/list) — notably no `businessId` or `dateCreated`. If you need those, use the list endpoint.
+</Info>
+
+## Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X GET https://sandbox.stellasbank.com/api/v1/clients/business/virtual-accounts/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
+  -H "businessId: YOUR_BUSINESS_ID"
+```
+
+```js Node.js
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/virtual-accounts/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+  {
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+    },
+  }
+);
+const { data } = await res.json();
+```
+
+```python Python
+import requests
+
+res = requests.get(
+    "https://sandbox.stellasbank.com/api/v1/clients/business/virtual-accounts/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+        "businessId": "YOUR_BUSINESS_ID",
+    },
+)
+print(res.json()["data"])
+```
+</CodeGroup>
+
+## Example response
+
+```json
+{
+  "status": true,
+  "message": "Successful",
+  "data": {
+    "id": "6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+    "clientRef": "ref_unique_001",
+    "systemRef": "STL|jYcphJZcT73yjv",
+    "name": "Ada Lovelace",
+    "accountNumber": "9000081483",
+    "bvn": "12345678901"
+  }
+}
+```
+
+## Errors
+
+| Status | Cause |
+|---|---|
+| `400 Bad Request` | `businessId` header missing |
+| `400 Bad Request` | The account exists but belongs to a different business (`"Account does not belong to this business"`) |
+| `401 Unauthorized` | Credentials missing or invalid |
+
+<Warning>
+  If `id` doesn't match any virtual account at all, this endpoint currently returns a generic `500 INTERNAL_SERVER_ERROR` rather than `404 Not Found` — there's no existence check before the ownership check runs. Don't rely on a `404` to detect an unknown `id`; treat any non-`200` response as "this account isn't accessible to you" and confirm the `id` came from [List virtual accounts](/api-reference/virtual-accounts/list) or a creation response before retrying.
+</Warning>
+
+See [Errors](/essentials/errors) for the full envelope and error code reference.

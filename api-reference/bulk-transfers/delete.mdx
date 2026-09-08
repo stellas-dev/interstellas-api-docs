@@ -1,0 +1,240 @@
+---
+title: "Delete"
+description: "Remove an entire batch, or a single item within one, before it starts processing."
+---
+
+Both endpoints below only work **before** a batch has started processing — once you've called [Process a bulk transfer](/api-reference/bulk-transfers/process), a batch and its items are permanent records. Deleting is for cleaning up mistakes (wrong file uploaded, wrong row, duplicate `batchName` attempt) before any money moves.
+
+<Info>
+  This applies to batches created either way — via [Create a bulk transfer](/api-reference/bulk-transfers/create) (JSON) or [Upload via Excel](/api-reference/bulk-transfers/upload). A freshly created batch is always `pending`; an uploaded batch may also be `enquiry_complete`. Both are deletable. Anything past that — `processing`, `completed`, `failed`, `partially_completed` — is not.
+</Info>
+
+## Delete a batch
+
+Permanently deletes the batch and every item in it.
+
+### Endpoint
+
+```
+DELETE /clients/business/customers/funds/bulk-transfer/{bulkTransferId}
+```
+
+### Path parameters
+
+<ParamField path="bulkTransferId" type="string" required>
+  The batch to delete.
+</ParamField>
+
+### Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID.
+</ParamField>
+
+### Response
+
+<ResponseField name="status" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  `"Batch deleted successfully"`.
+</ResponseField>
+
+<ResponseField name="data" type="null">
+  Always `null`.
+</ResponseField>
+
+<Warning>
+  This is permanent — there's no way to recover a deleted batch or its items. `bulkReference` and every item's `retrievalReference` are freed up for reuse afterward, same as if the batch had never been created.
+</Warning>
+
+### Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X DELETE https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
+  -H "businessId: YOUR_BUSINESS_ID"
+```
+
+```js Node.js
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+  {
+    method: "DELETE",
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+    },
+  }
+);
+const { message } = await res.json();
+```
+
+```python Python
+import requests
+
+res = requests.delete(
+    "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+        "businessId": "YOUR_BUSINESS_ID",
+    },
+)
+print(res.json())
+```
+</CodeGroup>
+
+### Example response
+
+```json
+{
+  "status": true,
+  "message": "Batch deleted successfully",
+  "data": null
+}
+```
+
+### Errors
+
+| Status | Cause |
+|---|---|
+| `400 Bad Request` | `bulkTransferId` isn't a valid UUID |
+| `400 Bad Request` | `businessId` header missing |
+| `404 Not Found` | No bulk transfer with this ID exists for your client and business |
+| `409 Conflict` | Batch status is no longer `pending`/`enquiry_complete` — processing has already started |
+| `401 Unauthorized` | Credentials invalid |
+
+---
+
+## Delete an item
+
+Removes a single item from a batch — most useful for dropping a row you decided you don't actually want, as an alternative to [editing it](/api-reference/bulk-transfers/upload#edit-an-item).
+
+<Info>
+  You can't delete the last remaining item in a batch — delete the whole batch instead in that case (see above).
+</Info>
+
+### Endpoint
+
+```
+DELETE /clients/business/customers/funds/bulk-transfer/{bulkTransferId}/items/{itemId}
+```
+
+### Path parameters
+
+<ParamField path="bulkTransferId" type="string" required>
+  The batch the item belongs to.
+</ParamField>
+
+<ParamField path="itemId" type="string" required>
+  The item to delete.
+</ParamField>
+
+### Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID.
+</ParamField>
+
+### Response
+
+<ResponseField name="status" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  `"Item deleted successfully"`.
+</ResponseField>
+
+<ResponseField name="data" type="null">
+  Always `null`.
+</ResponseField>
+
+<Info>
+  Deleting an item decrements the batch's `totalItems` by one, and adjusts `completedItems`/`failedItems` to match if the deleted item had already resolved or failed name verification (uploaded batches only — see the field-meaning caveat on [Upload via Excel](/api-reference/bulk-transfers/upload#preview)). Any other item's `itemIndex` is left as-is; indexes aren't renumbered.
+</Info>
+
+### Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X DELETE https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f/items/a1b2c3d4-0000-4a8d-9e2f-000000000002 \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
+  -H "businessId: YOUR_BUSINESS_ID"
+```
+
+```js Node.js
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f/items/a1b2c3d4-0000-4a8d-9e2f-000000000002",
+  {
+    method: "DELETE",
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+    },
+  }
+);
+const { message } = await res.json();
+```
+
+```python Python
+import requests
+
+res = requests.delete(
+    "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f/items/a1b2c3d4-0000-4a8d-9e2f-000000000002",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+        "businessId": "YOUR_BUSINESS_ID",
+    },
+)
+print(res.json())
+```
+</CodeGroup>
+
+### Example response
+
+```json
+{
+  "status": true,
+  "message": "Item deleted successfully",
+  "data": null
+}
+```
+
+### Errors
+
+| Status | Cause |
+|---|---|
+| `400 Bad Request` | `bulkTransferId` or `itemId` isn't a valid UUID |
+| `400 Bad Request` | `businessId` header missing |
+| `400 Bad Request` | `"Cannot delete the last item in a batch. Delete the batch instead."` |
+| `404 Not Found` | Batch or item not found for your client and business |
+| `409 Conflict` | Batch status is no longer `pending`/`enquiry_complete` — processing has already started |
+| `409 Conflict` | The item's own status is `processing` or `completed` — an in-flight or finished transfer can't be deleted |
+| `401 Unauthorized` | Credentials invalid |
+
+See [Errors](/essentials/errors) for the full envelope and error code reference.

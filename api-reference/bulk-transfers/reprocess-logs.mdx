@@ -1,0 +1,340 @@
+---
+title: "Reprocess logs"
+description: "Audit trail of every reprocess attempt for a batch or a single item."
+---
+
+Every call to [Reprocess](/api-reference/bulk-transfers/reprocess) — whether for a whole batch or a single item — creates a log entry. These endpoints let you query that history, which is useful for auditing who retried what and why an attempt failed, independent of the item's current live status.
+
+## Logs for a batch
+
+Returns reprocess log entries for every item in a batch, most recent first.
+
+### Endpoint
+
+```
+GET /clients/business/customers/funds/bulk-transfer/{bulkTransferId}/reprocess-logs
+```
+
+### Path parameters
+
+<ParamField path="bulkTransferId" type="string" required>
+  The batch to fetch reprocess logs for.
+</ParamField>
+
+### Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID.
+</ParamField>
+
+### Query parameters
+
+<ParamField query="page" type="integer">
+  Page number. Defaults to `1`.
+</ParamField>
+
+<ParamField query="limit" type="integer">
+  Records per page. Defaults to `20`, capped at `100`.
+</ParamField>
+
+<ParamField query="new_status" type="string">
+  Filter to logs whose outcome was this status. One of `completed`, `failed`, `pending`.
+</ParamField>
+
+<ParamField query="triggered_by_type" type="string">
+  Filter to logs triggered by this actor type. One of `member`, `admin`, `system`.
+</ParamField>
+
+<ParamField query="from_date" type="string">
+  ISO 8601 date — only include logs created on or after this date.
+</ParamField>
+
+<ParamField query="to_date" type="string">
+  ISO 8601 date — only include logs created on or before this date.
+</ParamField>
+
+<Warning>
+  API-triggered reprocesses are recorded with `triggeredByType: "api"` in the response, but `triggered_by_type` as a **filter** only accepts `member`, `admin`, or `system` — passing `api` is rejected as an invalid query parameter. There's currently no way to filter this endpoint down to only API-triggered attempts; omit the filter and check `triggeredByType` in the results client-side instead.
+</Warning>
+
+### Response
+
+<ResponseField name="status" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable outcome.
+</ResponseField>
+
+<ResponseField name="data.logs" type="array">
+  Reprocess log entries, most recently created first.
+</ResponseField>
+
+<ResponseField name="data.logs[].id" type="string">
+  Unique ID for this log entry.
+</ResponseField>
+
+<ResponseField name="data.logs[].bulkTransferId" type="string">
+  The batch this log entry belongs to.
+</ResponseField>
+
+<ResponseField name="data.logs[].bulkTransferItemId" type="string">
+  The item this log entry is about.
+</ResponseField>
+
+<ResponseField name="data.logs[].originalTransactionReference" type="string">
+  The transaction reference the item had immediately before this reprocess attempt.
+</ResponseField>
+
+<ResponseField name="data.logs[].newTransactionReference" type="string">
+  The new transaction reference generated for this attempt.
+</ResponseField>
+
+<ResponseField name="data.logs[].triggeredBy" type="string">
+  ID of whoever (or whatever) triggered this reprocess — a member ID or your API client's ID, depending on `triggeredByType`.
+</ResponseField>
+
+<ResponseField name="data.logs[].triggeredByType" type="string">
+  Who triggered this attempt: `member` (dashboard user), `api` (an API-key request like this one), `admin`, or `system`.
+</ResponseField>
+
+<ResponseField name="data.logs[].triggeredByName" type="string">
+  Display name of the trigger, if available. `null` for API-triggered attempts.
+</ResponseField>
+
+<ResponseField name="data.logs[].previousStatus" type="string">
+  The item's status immediately before this attempt — always `failed`, since only failed items are eligible for reprocessing.
+</ResponseField>
+
+<ResponseField name="data.logs[].newStatus" type="string">
+  The item's resulting status after this attempt. `null` while the attempt is still in flight.
+</ResponseField>
+
+<ResponseField name="data.logs[].failureReason" type="string">
+  Why the attempt failed, if `newStatus` is `failed`. `null` otherwise.
+</ResponseField>
+
+<ResponseField name="data.logs[].createdAt" type="string">
+  ISO 8601 timestamp of when this reprocess attempt was initiated.
+</ResponseField>
+
+<ResponseField name="pagination.page" type="integer">
+  The current page number.
+</ResponseField>
+
+<ResponseField name="pagination.limit" type="integer">
+  The page size used for this response.
+</ResponseField>
+
+<ResponseField name="pagination.total" type="integer">
+  Total number of log entries matching the current query, across all pages.
+</ResponseField>
+
+<ResponseField name="pagination.totalPages" type="integer">
+  The final page number, derived from `total ÷ limit`.
+</ResponseField>
+
+### Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X GET "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f/reprocess-logs?page=1&limit=20" \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
+  -H "businessId: YOUR_BUSINESS_ID"
+```
+
+```js Node.js
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f/reprocess-logs?page=1&limit=20",
+  {
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+    },
+  }
+);
+const { data, pagination } = await res.json();
+```
+
+```python Python
+import requests
+
+res = requests.get(
+    "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f/reprocess-logs",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+        "businessId": "YOUR_BUSINESS_ID",
+    },
+    params={"page": 1, "limit": 20},
+)
+print(res.json())
+```
+</CodeGroup>
+
+### Example response
+
+```json
+{
+  "status": true,
+  "message": "Reprocess logs retrieved successfully",
+  "data": {
+    "logs": [
+      {
+        "id": "log-0001",
+        "bulkTransferId": "6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+        "bulkTransferItemId": "a1b2c3d4-0000-4a8d-9e2f-000000000002",
+        "originalTransactionReference": "TRX-def456",
+        "newTransactionReference": "TRX-ghi789",
+        "triggeredBy": "6f9d3e2a-client-0001",
+        "triggeredByType": "api",
+        "triggeredByName": null,
+        "previousStatus": "failed",
+        "newStatus": "completed",
+        "failureReason": null,
+        "createdAt": "2024-07-01T10:15:00.000Z"
+      }
+    ]
+  },
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "totalPages": 1
+  }
+}
+```
+
+### Errors
+
+| Status | Cause |
+|---|---|
+| `400 Bad Request` | `bulkTransferId` isn't a valid UUID, or a filter value fails validation (e.g. an out-of-range `limit`, or an invalid `new_status`/`triggered_by_type`) |
+| `401 Unauthorized` | `businessId` header missing, or credentials invalid |
+| `404 Not Found` | No bulk transfer with this ID exists for your client and business |
+
+---
+
+## Logs for a single item
+
+Same as above, scoped to one item within a batch.
+
+### Endpoint
+
+```
+GET /clients/business/customers/funds/bulk-transfer/{bulkTransferId}/items/{itemId}/reprocess-logs
+```
+
+### Path parameters
+
+<ParamField path="bulkTransferId" type="string" required>
+  The batch the item belongs to.
+</ParamField>
+
+<ParamField path="itemId" type="string" required>
+  The item to fetch reprocess logs for.
+</ParamField>
+
+### Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID.
+</ParamField>
+
+### Query parameters
+
+<ParamField query="page" type="integer">
+  Page number. Defaults to `1`.
+</ParamField>
+
+<ParamField query="limit" type="integer">
+  Records per page. Defaults to `20`, capped at `100`.
+</ParamField>
+
+<ParamField query="new_status" type="string">
+  Filter to logs whose outcome was this status. One of `completed`, `failed`, `pending`.
+</ParamField>
+
+<ParamField query="from_date" type="string">
+  ISO 8601 date — only include logs created on or after this date.
+</ParamField>
+
+<ParamField query="to_date" type="string">
+  ISO 8601 date — only include logs created on or before this date.
+</ParamField>
+
+<Info>
+  Unlike the batch-level endpoint above, this one does not support filtering by `triggered_by_type`.
+</Info>
+
+### Response
+
+Same response shape as [logs for a batch](#logs-for-a-batch) above, filtered to the one item.
+
+### Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X GET "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f/items/a1b2c3d4-0000-4a8d-9e2f-000000000002/reprocess-logs" \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
+  -H "businessId: YOUR_BUSINESS_ID"
+```
+
+```js Node.js
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f/items/a1b2c3d4-0000-4a8d-9e2f-000000000002/reprocess-logs",
+  {
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+    },
+  }
+);
+const { data, pagination } = await res.json();
+```
+
+```python Python
+import requests
+
+res = requests.get(
+    "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer/6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f/items/a1b2c3d4-0000-4a8d-9e2f-000000000002/reprocess-logs",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+        "businessId": "YOUR_BUSINESS_ID",
+    },
+)
+print(res.json())
+```
+</CodeGroup>
+
+### Errors
+
+| Status | Cause |
+|---|---|
+| `400 Bad Request` | `bulkTransferId` or `itemId` isn't a valid UUID, or a filter value fails validation |
+| `401 Unauthorized` | `businessId` header missing, or credentials invalid |
+| `404 Not Found` | No bulk transfer with this ID exists for your client and business, or no item with this ID exists in that batch |
+
+See [Errors](/essentials/errors) for the full envelope and error code reference.

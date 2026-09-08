@@ -4,54 +4,104 @@ description: "How to authenticate requests to the Interstellas API."
 icon: "lock"
 ---
 
-The Interstellas API uses **session-based bearer token authentication**. You obtain an access token by calling the signin endpoint, then pass it — along with your secret key and business ID — on every subsequent request.
+The Interstellas API authenticates every request using two headers: an API key and an API secret. There is no session or token exchange step — generate a key pair from the dashboard and start making requests.
 
 ## Required headers
 
-Most business endpoints require all three of the following headers:
+Every API request must include both of the following headers:
 
 | Header | Value | Description |
 |--------|-------|-------------|
-| `Authorization` | `Bearer YOUR_ACCESS_TOKEN` | Token returned by `POST /auth/signin` |
-| `SECRET_KEY` | `YOUR_SECRET_KEY` | Static API key from the dashboard |
-| `businessId` | `YOUR_BUSINESS_ID` | ID of the business context for the request |
+| `x-api-key` | `YOUR_API_KEY` | Public identifier for your API client |
+| `x-api-secret` | `YOUR_API_SECRET` | Secret credential paired with your API key |
 
 ```http
-Authorization: Bearer YOUR_ACCESS_TOKEN
-SECRET_KEY: YOUR_SECRET_KEY
-businessId: YOUR_BUSINESS_ID
+x-api-key: stl_c8e286ca55b0123e0b05da047494f585
+x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0
 ```
 
-## Obtaining an access token
-
-Call `POST /auth/signin` with your registered email and password. The response includes a JWT `accessToken` and the list of businesses registered to your account. See the [signin reference](/api-reference/auth/signin) for the full request and response documentation.
-
-## Obtaining your secret key
-
-Your `SECRET_KEY` is available in the Interstellas dashboard under **Settings → API Keys**. You can also retrieve it programmatically via the [Get API keys](/api-reference/settings/get-keys) endpoint.
-
-## Obtaining your business ID
-
-Your `businessId` is returned in the `businesses` array from the signin response. If you have multiple businesses, choose the ID for the one you want to operate on.
-
-<Info>
-  The `Authorization` token is session-scoped and must be refreshed by re-authenticating. The `SECRET_KEY` is static until you rotate it manually.
-</Info>
+Most business endpoints also require a `businessId` header scoping the request to a specific business. See the [API overview](/api-reference/overview) and individual endpoint pages for which headers each endpoint expects.
 
 <Warning>
-  Never expose your `SECRET_KEY` or `accessToken` in client-side code, public repositories, or application logs. Treat both as passwords.
+  Do not send an `Authorization: Bearer` header alongside `x-api-key` / `x-api-secret` — requests that include both are rejected. Bearer tokens are used only by the Interstellas web dashboard and are not part of the API authentication scheme.
 </Warning>
+
+## Key format
+
+- `x-api-key` values look like `stl_` followed by 32 hexadecimal characters, e.g. `stl_c8e286ca55b0123e0b05da047494f585`.
+- `x-api-secret` values look like `stl_test_` or `stl_live_` followed by 64 hexadecimal characters.
+
+There is no separate "mode" flag or environment header — the `stl_test_` or `stl_live_` prefix on your secret determines whether a request is treated as sandbox or production traffic.
+
+| Prefix | Environment |
+|--------|-------------|
+| `stl_test_...` | Sandbox — use while building and testing your integration |
+| `stl_live_...` | Production — real transactions and real money movement |
+
+Live and test credentials are fully isolated from each other: they draw from separate rate-limit budgets and operate on separate data. A test key can never see or affect live data, and vice versa.
+
+## Generating and storing credentials
+
+Generate an API key pair from the Interstellas dashboard under **Settings → API Keys**. The `x-api-secret` is shown to you exactly once, at the moment it's created or regenerated — store it securely right away, since you won't be able to view it again afterward. If you lose it, you'll need to regenerate a new one, which invalidates the old secret.
+
+<Warning>
+  Never expose your `x-api-secret` in client-side code, public repositories, or application logs. Treat it like a password.
+</Warning>
+
+## Rotating and revoking keys
+
+You can regenerate your `x-api-secret` or revoke an API key entirely from the dashboard at any time. Revocation takes effect within about 60 seconds — a key you've just revoked may continue to work briefly during that window, so don't be alarmed if a request succeeds immediately after revoking.
 
 ## Security best practices
 
 - Store credentials in environment variables — never hard-code them in source files.
-- Use separate credentials for sandbox and production environments.
-- Rotate your `SECRET_KEY` immediately if you suspect it has been compromised.
-- Requests made with a missing or invalid credential return `401 Unauthorized`.
+- Use `stl_test_...` credentials in development and `stl_live_...` credentials only in production.
+- Revoke and regenerate a key immediately if you suspect it has been compromised.
+- Grant keys only the scopes they need (see below).
+
+## Scopes
+
+API keys carry a set of scopes, such as `transfers:read`, `transfers:write`, or `customers:read`. Where a scope check is enforced, a request made with a key that isn't scoped for the endpoint it's calling returns `403 Forbidden` rather than `401 Unauthorized`.
+
+<Note>
+  Every API key currently issued defaults to full access (`["*"]`), and no endpoint currently enforces per-scope checks. Scoping is part of the credential model but isn't yet gating any endpoint — don't build authorization logic in your integration around it until your account team confirms it's enforced for the endpoints you use.
+</Note>
+
+## Rate limits
+
+Rate limits are enforced per API client, per minute:
+
+| Tier | Limit |
+|------|-------|
+| Standard | 100 requests/minute |
+| Premium | 1,000 requests/minute |
+
+Your tier is assigned to your account based on your contract with Interstellas — it isn't self-service. Live and test credentials draw from separate rate-limit budgets, so testing against sandbox won't consume your production allowance.
+
+Exceeding your limit returns `429`, with a `Retry-After` header (seconds until you can retry):
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 60
+Content-Type: application/json
+
+{
+  "status": false,
+  "message": "Rate limit exceeded",
+  "error": { "code": "RATE_LIMIT_EXCEEDED" }
+}
+```
 
 ## Errors
 
-| Status | Meaning |
-|--------|---------|
-| `401 Unauthorized` | Missing, expired, or invalid `Authorization` token or `SECRET_KEY` |
-| `403 Forbidden` | Token is valid but lacks permission for the requested resource |
+A `401` is returned whenever a request can't be authenticated. The message is one of two generic buckets — a missing/malformed request (`"Unauthorized"`) or recognized-but-wrong credentials (`"Invalid credentials"`) — neither of which reveals which specific header or value was the problem:
+
+```json
+{
+  "status": false,
+  "message": "Invalid credentials",
+  "error": { "code": "AUTHENTICATION_ERROR" }
+}
+```
+
+See [Errors](/essentials/errors) for the full error envelope, error codes, and authentication error reference.

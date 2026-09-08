@@ -26,16 +26,16 @@ Use the sandbox URL while building and testing your integration. Switch to produ
 Every business endpoint requires three headers:
 
 ```http
-Authorization: Bearer YOUR_ACCESS_TOKEN
-SECRET_KEY: YOUR_SECRET_KEY
+x-api-key: YOUR_API_KEY
+x-api-secret: YOUR_API_SECRET
 businessId: YOUR_BUSINESS_ID
 ```
 
-See [Authentication](/authentication) for how to obtain each credential.
+See [Authentication](/authentication) for how to obtain each credential, key formats, rate limits, and scopes.
 
 ## Response envelope
 
-All responses — success and error — follow the same JSON envelope:
+Success responses follow this envelope:
 
 ```json
 {
@@ -53,17 +53,19 @@ All responses — success and error — follow the same JSON envelope:
   A human-readable outcome description. Use for logging — do not drive application logic from this string.
 </ResponseField>
 
-<ResponseField name="data" type="object | array | null">
-  The response payload. A single object for actions and detail endpoints; an array for list endpoints; `null` on errors.
+<ResponseField name="data" type="object | array" required>
+  The response payload. A single object for actions and detail endpoints; an array for list endpoints.
 </ResponseField>
+
+Error responses use a different shape — `status: false`, no `data` field at all, and an `error` object with a machine-readable `code`. See [Errors](/essentials/errors) for the full envelope and error code reference.
 
 ## List responses and pagination
 
-Endpoints that return collections include a `pagination` object alongside `data`. See [Pagination](/essentials/pagination) for the full field reference and usage examples.
+Endpoints that return collections include a `pagination` object alongside `data`. **The exact fields in `pagination` vary by endpoint** — see [Pagination](/essentials/pagination) for the two shapes in use and each endpoint's own reference page for which one it returns.
 
 ## Errors
 
-On failure, `status` is `false` and `message` describes the problem. See [Errors](/essentials/errors) for the full status code reference and handling guidance.
+On failure, `status` is `false` and `message` describes the problem — see [Errors](/essentials/errors) for the full envelope, error code table, and handling guidance.
 
 ## Postman collection
 

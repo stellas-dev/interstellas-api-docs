@@ -2,10 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "Interstellas",
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
+  "logo": "https://interstellas.stellasbank.com/static/media/mainbrand.6ccf1d44.svg",
   "favicon": "/favicon.svg",
   "colors": {
     "primary": "#6C47FF",
@@ -15,12 +12,12 @@
   "topbarLinks": [
     {
       "name": "Support",
-      "url": "mailto:support@interstellas.com"
+      "url": "mailto:support@interstellas.stellasbank.com"
     }
   ],
   "topbarCtaButton": {
     "name": "Get Started",
-    "url": "https://interstellas.com"
+    "url": "https://interstellas.stellasbank.com"
   },
   "navigation": {
     "tabs": [
@@ -49,10 +46,6 @@
             "pages": ["api-reference/overview"]
           },
           {
-            "group": "Auth",
-            "pages": ["api-reference/auth/signin"]
-          },
-          {
             "group": "Members",
             "pages": [
               "api-reference/members/invite",
@@ -77,9 +70,11 @@
           {
             "group": "Virtual accounts",
             "pages": [
+              "api-reference/virtual-accounts/overview",
               "api-reference/virtual-accounts/create",
               "api-reference/virtual-accounts/create-single-use",
-              "api-reference/virtual-accounts/transactions"
+              "api-reference/virtual-accounts/list",
+              "api-reference/virtual-accounts/get"
             ]
           },
           {
@@ -89,6 +84,20 @@
               "api-reference/funds/customer-transfer",
               "api-reference/funds/withdraw",
               "api-reference/funds/anonymous-transfer"
+            ]
+          },
+          {
+            "group": "Bulk transfers",
+            "pages": [
+              "api-reference/bulk-transfers/overview",
+              "api-reference/bulk-transfers/create",
+              "api-reference/bulk-transfers/upload",
+              "api-reference/bulk-transfers/process",
+              "api-reference/bulk-transfers/delete",
+              "api-reference/bulk-transfers/get",
+              "api-reference/bulk-transfers/list",
+              "api-reference/bulk-transfers/reprocess",
+              "api-reference/bulk-transfers/reprocess-logs"
             ]
           },
           {
@@ -125,7 +134,6 @@
           {
             "group": "Settings",
             "pages": [
-              "api-reference/settings/get-keys",
               "api-reference/settings/billers",
               "api-reference/settings/configure-billers",
               "api-reference/settings/webhook"

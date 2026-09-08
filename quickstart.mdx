@@ -4,80 +4,23 @@ description: "Authenticate and make your first API call in minutes."
 icon: "rocket"
 ---
 
-The Interstellas API uses session-based bearer token authentication. Before calling any business endpoint, sign in to exchange your credentials for an access token.
+The Interstellas API authenticates every request with an API key and secret — there's no separate sign-in step. Generate a credential pair from the dashboard and you're ready to call any endpoint.
 
 ## Prerequisites
 
-- An Interstellas account — [sign up at interstellas.com](https://interstellas.com)
-- Your account `email` and `password`
-- Your `SECRET_KEY` from **Settings → API Keys** in the dashboard
+- An Interstellas account — [sign up at interstellas.stellasbank.com](https://interstellas.stellasbank.com)
+- An API key and secret from **Settings → API Keys** in the dashboard (use your `stl_test_...` secret while building against sandbox)
+- Your `businessId` — returned when you [create a business](/api-reference/business/create) or from [listing businesses](/api-reference/business/list)
 
-## Step 1 — Sign in and get an access token
+## Make an authenticated request
 
-<CodeGroup>
-```bash cURL
-curl -X POST https://sandbox.stellasbank.com/api/v1/auth/signin \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "you@example.com",
-    "password": "YOUR_PASSWORD"
-  }'
-```
-
-```js Node.js
-const res = await fetch("https://sandbox.stellasbank.com/api/v1/auth/signin", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ email: "you@example.com", password: "YOUR_PASSWORD" }),
-});
-const { data } = await res.json();
-const { accessToken, businesses } = data;
-```
-
-```python Python
-import requests
-
-res = requests.post(
-    "https://sandbox.stellasbank.com/api/v1/auth/signin",
-    json={"email": "you@example.com", "password": "YOUR_PASSWORD"},
-)
-data = res.json()["data"]
-access_token = data["accessToken"]
-business_id = data["businesses"][0]["id"]
-```
-</CodeGroup>
-
-A successful response returns your `accessToken` and the list of businesses registered to your account:
-
-```json
-{
-  "status": true,
-  "message": "Login successful",
-  "data": {
-    "id": "usr_abc123",
-    "firstName": "Ada",
-    "lastName": "Lovelace",
-    "email": "you@example.com",
-    "phoneNo": "+2348012345678",
-    "accessToken": "eyJhbGciOiJIUzI1NiIs...",
-    "businesses": [
-      { "id": "biz_xyz789", "businessName": "Acme Ltd", "isApproved": true }
-    ]
-  }
-}
-```
-
-Save the `accessToken` and note the `id` from the `businesses` array — that is your `businessId`.
-
-## Step 2 — Make an authenticated request
-
-Every business endpoint requires three headers: your access token, your secret key, and your business ID.
+Every business endpoint requires three headers: your API key, your API secret, and your business ID.
 
 <CodeGroup>
 ```bash cURL
 curl -X GET https://sandbox.stellasbank.com/api/v1/clients/business/account-details \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -H "SECRET_KEY: YOUR_SECRET_KEY" \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
   -H "businessId: YOUR_BUSINESS_ID"
 ```
 
@@ -86,8 +29,8 @@ const res = await fetch(
   "https://sandbox.stellasbank.com/api/v1/clients/business/account-details",
   {
     headers: {
-      Authorization: "Bearer YOUR_ACCESS_TOKEN",
-      SECRET_KEY: "YOUR_SECRET_KEY",
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
       businessId: "YOUR_BUSINESS_ID",
     },
   }
@@ -101,8 +44,8 @@ import requests
 res = requests.get(
     "https://sandbox.stellasbank.com/api/v1/clients/business/account-details",
     headers={
-        "Authorization": "Bearer YOUR_ACCESS_TOKEN",
-        "SECRET_KEY": "YOUR_SECRET_KEY",
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
         "businessId": "YOUR_BUSINESS_ID",
     },
 )
@@ -110,11 +53,27 @@ print(res.json()["data"])
 ```
 </CodeGroup>
 
+A successful response returns your business's account details:
+
+```json
+{
+  "status": true,
+  "message": "Account details retrieved successfully",
+  "data": {
+    "accountNumber": "0123456789",
+    "accountType": "current",
+    "customerId": "cust_abc123",
+    "businessId": "biz_xyz789",
+    "accountBalance": "5000000"
+  }
+}
+```
+
 ## Next steps
 
 <CardGroup cols={2}>
   <Card title="Authentication" icon="key" href="/authentication">
-    Understand the full three-header auth scheme and how to manage credentials.
+    Understand key formats, live vs. test environments, and how to manage credentials.
   </Card>
   <Card title="API Reference" icon="code" href="/api-reference/overview">
     Browse every available endpoint.

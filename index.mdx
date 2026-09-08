@@ -16,7 +16,7 @@ All endpoints are organised around the core resources you interact with on the d
 **Base URL**
 
 ```
-https://interstellas-api.stellasbank.com/api/v1
+https://sandbox.stellasbank.com/api/v1
 ```
 
 <CardGroup cols={2}>
@@ -38,16 +38,17 @@ https://interstellas-api.stellasbank.com/api/v1
 
 ## Authentication
 
-The Interstellas API uses secret API keys to authenticate requests. Your credentials are issued by the Interstellas team. You will receive a **test key** for development and a **live key** for production — always use test keys while building and validating your integration.
+The Interstellas API authenticates every request with an API key and secret. Generate a credential pair from the dashboard — you'll receive a **test secret** (`stl_test_...`) for sandbox and a **live secret** (`stl_live_...`) for production. Always use test credentials while building and validating your integration.
 
-Pass your API Secret Key in the `Authorization` header of every request:
+Pass both on every request:
 
 ```http
-Authorization: Bearer YOUR_SECRET_KEY
+x-api-key: YOUR_API_KEY
+x-api-secret: YOUR_API_SECRET
 ```
 
 <Warning>
-  Your API keys carry significant privileges. Never expose them in client-side code, public repositories, or application logs. Requests made without a valid key will return `401 Unauthorized`.
+  Your API key and secret carry significant privileges. Never expose them in client-side code, public repositories, or application logs. Requests made without valid credentials return `401 Unauthorized`.
 </Warning>
 
 ---
@@ -100,42 +101,10 @@ Endpoints that return collections of resources support page-based pagination. Us
 {
   "status": true,
   "data": [],
-  "pagination": {
-    "totalCount": 84,
-    "hasNextPage": true,
-    "hasPreviousPage": false,
-    "nextPage": 2,
-    "previousPage": 0,
-    "limit": 10,
-    "lastPage": 9
-  }
+  "pagination": { ... }
 }
 ```
 
-<ResponseField name="pagination.totalCount" type="integer">
-  The total number of records matching the current query, across all pages.
-</ResponseField>
-
-<ResponseField name="pagination.hasNextPage" type="boolean">
-  `true` if additional records exist beyond the current page.
-</ResponseField>
-
-<ResponseField name="pagination.hasPreviousPage" type="boolean">
-  `true` if records exist on pages before the current one.
-</ResponseField>
-
-<ResponseField name="pagination.nextPage" type="integer">
-  The page number to pass as `?page=` to retrieve the next set of records. Only meaningful when `hasNextPage` is `true`.
-</ResponseField>
-
-<ResponseField name="pagination.previousPage" type="integer">
-  The page number to pass as `?page=` to retrieve the previous set of records. Only meaningful when `hasPreviousPage` is `true`.
-</ResponseField>
-
-<ResponseField name="pagination.limit" type="integer">
-  The maximum number of records returned per request. Defaults to `10`. Override with a `limit` query parameter — for example, `?limit=25`.
-</ResponseField>
-
-<ResponseField name="pagination.lastPage" type="integer">
-  The number of the final page of results, derived from `totalCount` and `limit`.
-</ResponseField>
+<Warning>
+  The exact fields inside `pagination` **differ by endpoint** — there are two shapes in use across the API. See [Pagination](/essentials/pagination) for both shapes, and each endpoint's own reference page for which one it returns.
+</Warning>

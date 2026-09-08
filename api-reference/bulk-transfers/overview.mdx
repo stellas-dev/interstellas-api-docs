@@ -1,0 +1,103 @@
+---
+title: "Bulk transfers overview"
+description: "Send many payouts in a single request and track each one through to completion."
+icon: "layer-group"
+---
+
+Bulk transfer lets you submit a batch of up to 5,000 individual bank transfers in one API call. Interstellas creates a record for the batch and for every line item inside it; you then explicitly start processing, and each transfer executes in the background. You track progress by polling the batch (or a single item), and you can selectively retry whatever failed — without resubmitting the transfers that already succeeded.
+
+This page explains the concepts that apply across every bulk transfer endpoint. For request/response details, see:
+
+<CardGroup cols={2}>
+  <Card title="Create a bulk transfer" icon="upload" href="/api-reference/bulk-transfers/create">
+    Submit a batch of transfers as JSON.
+  </Card>
+  <Card title="Upload via Excel" icon="file-spreadsheet" href="/api-reference/bulk-transfers/upload">
+    Submit a batch by uploading a spreadsheet instead.
+  </Card>
+  <Card title="Process a bulk transfer" icon="play" href="/api-reference/bulk-transfers/process">
+    Start background processing for a batch.
+  </Card>
+  <Card title="Delete" icon="trash" href="/api-reference/bulk-transfers/delete">
+    Remove a batch or item before processing starts.
+  </Card>
+  <Card title="Get a bulk transfer" icon="magnifying-glass" href="/api-reference/bulk-transfers/get">
+    Retrieve a batch and every item inside it.
+  </Card>
+  <Card title="List bulk transfers" icon="list" href="/api-reference/bulk-transfers/list">
+    Retrieve every batch for your business.
+  </Card>
+  <Card title="Reprocess" icon="arrow-rotate-right" href="/api-reference/bulk-transfers/reprocess">
+    Retry a failed batch, or specific failed items.
+  </Card>
+  <Card title="Reprocess logs" icon="clock-rotate-left" href="/api-reference/bulk-transfers/reprocess-logs">
+    Audit trail of every retry attempt.
+  </Card>
+</CardGroup>
+
+## How it works
+
+1. **You submit a batch**, one of two ways:
+   - A `POST` request with a `batchName` and a `transfers` array — one entry per payment you want to make. Interstellas validates the batch, writes a row for the batch and one row per transfer, and responds immediately with `201 Created`.
+   - Or [upload an Excel spreadsheet](/api-reference/bulk-transfers/upload) instead — Interstellas parses it into the same batch/item structure, then verifies every recipient's account name in the background before you're expected to process it. This path has extra steps (poll a preview, fix anything that failed verification) that the JSON path doesn't need, since JSON submissions are trusted to already have correct recipient details.
+
+   Either way, nothing has been paid out yet at this point — every item starts in `pending`. If you spot a mistake before processing, this is also your window to fix it — [edit](/api-reference/bulk-transfers/upload#edit-an-item) or [delete](/api-reference/bulk-transfers/delete) a single item, or delete the whole batch and start over.
+2. **You start processing.** Batches don't begin executing on their own — call [Process a bulk transfer](/api-reference/bulk-transfers/process) with the `bulkTransferId` once you're ready. This queues every `pending` item for background execution and returns `202 Accepted` immediately. This is also the point of no return — batches and items can no longer be edited or deleted after this.
+3. **Interstellas processes items in the background.** Each item moves through `pending` → `processing` → `completed` or `failed` independently. There's no webhook for this today — poll [Get a bulk transfer](/api-reference/bulk-transfers/get) to watch progress.
+4. **The batch status reflects its items.** Once every item has reached a final state, the batch itself settles into `completed` (all items succeeded), `failed` (none succeeded), or `partially_completed` (a mix).
+5. **You reprocess what failed.** If any items end up `failed`, you can retry all of them at once or one at a time — see [Reprocess](/api-reference/bulk-transfers/reprocess). Items that already `completed` are never touched by a retry.
+
+## Statuses
+
+### Batch (`status` on the bulk transfer)
+
+| Status | Meaning |
+|---|---|
+| `pending` | Batch created; no items have started processing yet |
+| `processing` | At least one item is currently being processed |
+| `completed` | Every item completed successfully |
+| `failed` | Every item failed |
+| `partially_completed` | A mix of completed and failed items |
+| `enquiry_complete` | Uploaded-via-Excel batches only — recipient name verification has finished for every row. See [Upload via Excel](/api-reference/bulk-transfers/upload). |
+
+### Item (`status` on each transfer within `items`)
+
+| Status | Meaning |
+|---|---|
+| `pending` | Not yet processed |
+| `processing` | Currently being processed |
+| `completed` | Transfer succeeded — see `providerReference` |
+| `failed` | Transfer failed — see `errorMessage` and `errorCode` |
+
+<Info>
+  Only items in `failed` status are eligible for reprocessing. A `pending` or `processing` item hasn't finished yet — wait for it to reach a final state.
+</Info>
+
+## Why an item fails
+
+`errorMessage` on a failed item is a human-readable description of what went wrong. Common causes include:
+
+- **Recipient account validation failed** — the account number/bank code combination couldn't be verified before the transfer was attempted.
+- **Insufficient funds** — your business account didn't have enough available balance to cover the transfer at the moment it was processed. Because items are processed after the batch is accepted, this can happen even though the batch itself was created successfully.
+- **The receiving bank or provider rejected the transfer** — surfaced with whatever reason the provider returned.
+
+`errorCode` is provider- or validation-supplied and not a fixed enum — treat it as informational context alongside `errorMessage`, not a value to branch your application logic on.
+
+## Idempotency and uniqueness
+
+- **`batchName`** must be unique per business. Submitting the same `batchName` twice returns `409 Conflict` rather than creating a duplicate batch — use this to safely retry a batch *creation* request without double-submitting if your client times out.
+- **`retrievalReference`** on each transfer must be unique across your business's transfer history, not just within the batch. Reusing one — even from a previous batch — is rejected.
+
+## Reprocessing in depth
+
+Reprocessing a failed item doesn't reuse the original transaction reference — Interstellas generates a **new** transaction reference for each attempt and keeps the very first one around as `originalTransactionReference`, so you can always trace an item back to its first attempt even after several retries. `reprocessCount` tracks how many times an item has been retried.
+
+Reprocessing is asynchronous, same as the original batch: the reprocess endpoints return `202 Accepted` immediately, and you poll [Get a bulk transfer](/api-reference/bulk-transfers/get) (or the item's own [reprocess logs](/api-reference/bulk-transfers/reprocess-logs)) to see the outcome. Every retry — successful or not — is recorded as a reprocess log entry you can query independently of the batch/item's current state.
+
+## Field naming
+
+Bulk transfer responses use `camelCase` field names throughout (`bulkReference`, `totalItems`, `receiverAccountNumber`, and so on) — this differs in casing convention from a couple of older endpoints elsewhere in this API, but is consistent across every bulk transfer response.
+
+## Amounts
+
+As with every other transfer endpoint in this API, `amount` is denominated in **kobo** (the smallest unit of NGN) and sent as a string, e.g. `"100000"` for ₦1,000.

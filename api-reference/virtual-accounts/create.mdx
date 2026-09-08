@@ -1,9 +1,18 @@
 ---
 title: "Create permanent virtual account"
-description: "Generate a multi-use virtual account for collecting payments."
+description: "Generate a multi-use virtual account — either a balance-holding wallet or a pass-through collection account."
 ---
 
-Multi-use virtual accounts can accept multiple incoming payments. Use them when you need a persistent collection account for a customer or use case.
+<Info>
+  New to virtual accounts? Read the [overview](/api-reference/virtual-accounts/overview) first — it explains the difference between `permanent` and `permanent_collection`, which matters before you pick one.
+</Info>
+
+This endpoint creates a multi-use virtual account of one of two types:
+
+- **`permanent`** — behaves like a wallet. Funds received into it accumulate as a balance you later move out via [Withdraw funds](/api-reference/funds/withdraw) or a [virtual account transfer](/api-reference/funds/virtual-account-transfer).
+- **`permanent_collection`** — a pass-through account. It exists to identify incoming payments, not to hold them.
+
+Both types can accept unlimited incoming payments and never expire on their own.
 
 ## Endpoint
 
@@ -13,12 +22,12 @@ POST /clients/business/virtual-accounts
 
 ## Headers
 
-<ParamField header="Authorization" type="string" required>
-  `Bearer YOUR_ACCESS_TOKEN`
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
 </ParamField>
 
-<ParamField header="SECRET_KEY" type="string" required>
-  Your API secret key.
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
 </ParamField>
 
 <ParamField header="businessId" type="string" required>
@@ -36,11 +45,15 @@ POST /clients/business/virtual-accounts
 </ParamField>
 
 <ParamField body="type" type="string" required>
-  Account duration type. Accepted values: `"temporal"` or `"permanent"`.
+  Account type. Accepted values: `"permanent"` (wallet — holds a balance) or `"permanent_collection"` (pass-through — see [overview](/api-reference/virtual-accounts/overview)).
+</ParamField>
+
+<ParamField body="bvn" type="string" required>
+  The account holder's Bank Verification Number. Must be exactly 11 digits.
 </ParamField>
 
 <ParamField body="reference" type="string" required>
-  A unique reference string you generate to identify this account in your system. Must be unique per account.
+  A unique reference string you generate to identify this account in your system. Must be unique across your account — creating a second account with a reference you've already used returns an error.
 </ParamField>
 
 ## Response
@@ -91,14 +104,15 @@ Returns `201 Created` on success.
 <CodeGroup>
 ```bash cURL
 curl -X POST https://sandbox.stellasbank.com/api/v1/clients/business/virtual-accounts \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -H "SECRET_KEY: YOUR_SECRET_KEY" \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
   -H "businessId: YOUR_BUSINESS_ID" \
   -H "Content-Type: application/json" \
   -d '{
     "firstName": "Ada",
     "lastName": "Lovelace",
     "type": "permanent",
+    "bvn": "12345678901",
     "reference": "ref_unique_001"
   }'
 ```
@@ -109,8 +123,8 @@ const res = await fetch(
   {
     method: "POST",
     headers: {
-      Authorization: "Bearer YOUR_ACCESS_TOKEN",
-      SECRET_KEY: "YOUR_SECRET_KEY",
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
       businessId: "YOUR_BUSINESS_ID",
       "Content-Type": "application/json",
     },
@@ -118,6 +132,7 @@ const res = await fetch(
       firstName: "Ada",
       lastName: "Lovelace",
       type: "permanent",
+      bvn: "12345678901",
       reference: "ref_unique_001",
     }),
   }
@@ -131,17 +146,42 @@ import requests
 res = requests.post(
     "https://sandbox.stellasbank.com/api/v1/clients/business/virtual-accounts",
     headers={
-        "Authorization": "Bearer YOUR_ACCESS_TOKEN",
-        "SECRET_KEY": "YOUR_SECRET_KEY",
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
         "businessId": "YOUR_BUSINESS_ID",
     },
     json={
         "firstName": "Ada",
         "lastName": "Lovelace",
         "type": "permanent",
+        "bvn": "12345678901",
         "reference": "ref_unique_001",
     },
 )
 print(res.json())
 ```
 </CodeGroup>
+
+## Errors
+
+| Status | Cause |
+|---|---|
+| `400 Bad Request` | `reference`, `firstName`, `lastName`, or `bvn` missing |
+| `400 Bad Request` | `bvn` is not exactly 11 characters |
+| `400 Bad Request` | `type` is anything other than `"permanent"` or `"permanent_collection"` |
+| `400 Bad Request` | `reference` already exists (`"Reference already exists"`) |
+| `400 Bad Request` | `"No payment account for this business"` — set up your business's own payment account first |
+| `401 Unauthorized` | `businessId` header missing, or credentials invalid |
+
+See [Errors](/essentials/errors) for the full envelope and error code reference.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Withdraw funds" icon="arrow-up-from-bracket" href="/api-reference/funds/withdraw">
+    Move a balance out of a `permanent` account.
+  </Card>
+  <Card title="List virtual accounts" icon="list" href="/api-reference/virtual-accounts/list">
+    See every virtual account for your business.
+  </Card>
+</CardGroup>

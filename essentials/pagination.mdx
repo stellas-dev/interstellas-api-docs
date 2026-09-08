@@ -3,7 +3,7 @@ title: "Pagination"
 description: "How to work with paginated list endpoints in the Interstellas API."
 ---
 
-All list endpoints in the Interstellas API return paginated results. Use the `page` and `limit` query parameters to control which subset of records you receive.
+List endpoints in the Interstellas API support page-based pagination via `page` and `limit` query parameters. Every paginated response includes a top-level `pagination` object alongside `data` — but **the fields inside that object differ by endpoint**. There are two shapes in use across the API; check the endpoint's own reference page to see which one it returns before you write parsing code against it.
 
 ## Query parameters
 
@@ -12,7 +12,7 @@ All list endpoints in the Interstellas API return paginated results. Use the `pa
 </ParamField>
 
 <ParamField query="limit" type="integer">
-  The number of records to return per page. Defaults to `10`.
+  The number of records to return per page. Defaults to `10` or `20` depending on the endpoint — check the endpoint's reference page.
 </ParamField>
 
 Example request for page 2 with 25 results per page:
@@ -21,9 +21,9 @@ Example request for page 2 with 25 results per page:
 GET /api/v1/clients/members?page=2&limit=25
 ```
 
-## Pagination object
+## Shape A — counts and page-existence flags
 
-When a list endpoint returns paginated data, the response includes a `pagination` object alongside `data`:
+Used by endpoints such as [List members](/api-reference/members/list) and [List disputes](/api-reference/disputes/list):
 
 ```json
 {
@@ -63,17 +63,57 @@ When a list endpoint returns paginated data, the response includes a `pagination
 </ResponseField>
 
 <ResponseField name="pagination.limit" type="integer">
-  The page size used for this response — reflects your `limit` parameter or the default of `10`.
+  The page size used for this response — reflects your `limit` parameter or the endpoint's default.
 </ResponseField>
 
 <ResponseField name="pagination.lastPage" type="integer">
   The final page number, derived from `totalCount ÷ limit`.
 </ResponseField>
 
+## Shape B — current page and totals
+
+Used by endpoints such as [List audit logs](/api-reference/audit-logs/list), [List businesses](/api-reference/business/list), [List customers](/api-reference/business/customers), [List subscriptions](/api-reference/subscriptions/list), and [List virtual accounts](/api-reference/virtual-accounts/list):
+
+```json
+{
+  "status": true,
+  "message": "Successful",
+  "data": [...],
+  "pagination": {
+    "page": 2,
+    "limit": 25,
+    "total": 84,
+    "totalPages": 4
+  }
+}
+```
+
+<ResponseField name="pagination.page" type="integer">
+  The current page number, echoing your `page` parameter or its default.
+</ResponseField>
+
+<ResponseField name="pagination.limit" type="integer">
+  The page size used for this response.
+</ResponseField>
+
+<ResponseField name="pagination.total" type="integer">
+  Total number of records matching the current query, across all pages.
+</ResponseField>
+
+<ResponseField name="pagination.totalPages" type="integer">
+  The final page number, derived from `total ÷ limit`.
+</ResponseField>
+
+<Info>
+  Some list endpoints — such as [List payout accounts](/api-reference/payouts/list) — return a plain array with no `pagination` object at all. Don't assume one is present; check the endpoint's reference page.
+</Info>
+
 ## Iterating all pages
 
+Since the field names differ, write your paging loop against the specific shape the endpoint you're calling returns. For a Shape A endpoint:
+
 ```js Node.js
-async function fetchAll(url, headers) {
+async function fetchAllShapeA(url, headers) {
   let page = 1;
   let hasNextPage = true;
   const results = [];
@@ -84,6 +124,25 @@ async function fetchAll(url, headers) {
     results.push(...json.data);
     hasNextPage = json.pagination.hasNextPage;
     page = json.pagination.nextPage;
+  }
+
+  return results;
+}
+```
+
+For a Shape B endpoint:
+
+```js Node.js
+async function fetchAllShapeB(url, headers) {
+  let page = 1;
+  const results = [];
+
+  while (true) {
+    const res = await fetch(`${url}?page=${page}&limit=50`, { headers });
+    const json = await res.json();
+    results.push(...json.data);
+    if (page >= json.pagination.totalPages) break;
+    page += 1;
   }
 
   return results;

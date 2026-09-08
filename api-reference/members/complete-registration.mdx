@@ -15,8 +15,12 @@ PATCH /clients/members/complete-registration
 
 ## Headers
 
-<ParamField header="SECRET_KEY" type="string" required>
-  Your API secret key.
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
 </ParamField>
 
 ## Request body
@@ -56,7 +60,8 @@ PATCH /clients/members/complete-registration
 <CodeGroup>
 ```bash cURL
 curl -X PATCH https://sandbox.stellasbank.com/api/v1/clients/members/complete-registration \
-  -H "SECRET_KEY: YOUR_SECRET_KEY" \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
   -H "Content-Type: application/json" \
   -d '{
     "authorizationToken": "TOKEN_FROM_EMAIL",
@@ -73,7 +78,8 @@ const res = await fetch(
   {
     method: "PATCH",
     headers: {
-      SECRET_KEY: "YOUR_SECRET_KEY",
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -93,7 +99,10 @@ import requests
 
 res = requests.patch(
     "https://sandbox.stellasbank.com/api/v1/clients/members/complete-registration",
-    headers={"SECRET_KEY": "YOUR_SECRET_KEY"},
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+    },
     json={
         "authorizationToken": "TOKEN_FROM_EMAIL",
         "firstName": "Ada",

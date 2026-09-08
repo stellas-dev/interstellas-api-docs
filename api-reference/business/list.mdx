@@ -11,12 +11,12 @@ GET /clients/business
 
 ## Headers
 
-<ParamField header="Authorization" type="string" required>
-  `Bearer YOUR_ACCESS_TOKEN`
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
 </ParamField>
 
-<ParamField header="SECRET_KEY" type="string" required>
-  Your API secret key.
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
 </ParamField>
 
 <ParamField header="businessId" type="string" required>
@@ -30,7 +30,7 @@ GET /clients/business
 </ParamField>
 
 <ParamField query="limit" type="integer">
-  Records per page. Defaults to `10`.
+  Records per page. Defaults to `20`.
 </ParamField>
 
 See [Pagination](/essentials/pagination) for full usage.
@@ -89,8 +89,20 @@ See [Pagination](/essentials/pagination) for full usage.
   The client account this business belongs to.
 </ResponseField>
 
-<ResponseField name="pagination" type="object">
-  Standard pagination envelope. See [Pagination](/essentials/pagination).
+<ResponseField name="pagination.page" type="integer">
+  The current page number.
+</ResponseField>
+
+<ResponseField name="pagination.limit" type="integer">
+  The page size used for this response.
+</ResponseField>
+
+<ResponseField name="pagination.total" type="integer">
+  Total number of records matching the current query, across all pages.
+</ResponseField>
+
+<ResponseField name="pagination.totalPages" type="integer">
+  The final page number, derived from `total ÷ limit`. See [Pagination](/essentials/pagination) — this endpoint uses Shape B.
 </ResponseField>
 
 ## Code examples
@@ -98,8 +110,8 @@ See [Pagination](/essentials/pagination) for full usage.
 <CodeGroup>
 ```bash cURL
 curl -X GET "https://sandbox.stellasbank.com/api/v1/clients/business?page=1&limit=10" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -H "SECRET_KEY: YOUR_SECRET_KEY" \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
   -H "businessId: YOUR_BUSINESS_ID"
 ```
 
@@ -108,8 +120,8 @@ const res = await fetch(
   "https://sandbox.stellasbank.com/api/v1/clients/business?page=1&limit=10",
   {
     headers: {
-      Authorization: "Bearer YOUR_ACCESS_TOKEN",
-      SECRET_KEY: "YOUR_SECRET_KEY",
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
       businessId: "YOUR_BUSINESS_ID",
     },
   }
@@ -123,8 +135,8 @@ import requests
 res = requests.get(
     "https://sandbox.stellasbank.com/api/v1/clients/business",
     headers={
-        "Authorization": "Bearer YOUR_ACCESS_TOKEN",
-        "SECRET_KEY": "YOUR_SECRET_KEY",
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
         "businessId": "YOUR_BUSINESS_ID",
     },
     params={"page": 1, "limit": 10},
@@ -154,13 +166,10 @@ print(res.json())
     }
   ],
   "pagination": {
-    "totalCount": 3,
-    "hasNextPage": false,
-    "hasPreviousPage": false,
-    "nextPage": 0,
-    "previousPage": 0,
-    "limit": 10,
-    "lastPage": 1
+    "page": 1,
+    "limit": 20,
+    "total": 3,
+    "totalPages": 1
   }
 }
 ```

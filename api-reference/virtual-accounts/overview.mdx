@@ -1,0 +1,68 @@
+---
+title: "Virtual accounts overview"
+description: "Choose the right virtual account type and understand how funds flow through each one."
+icon: "building-columns"
+---
+
+A virtual account is a dedicated NUBAN account number you generate for a customer or a transaction, so incoming payments arrive already identified — no manual reconciliation. Interstellas supports three account types, and picking the right one matters: it determines whether the account behaves like a wallet you can hold a balance in, or a pass-through that just routes money to your business's own pool account.
+
+<CardGroup cols={2}>
+  <Card title="Create permanent virtual account" icon="building-columns" href="/api-reference/virtual-accounts/create">
+    Generate a `permanent` or `permanent_collection` account.
+  </Card>
+  <Card title="Create single-use virtual account" icon="clock" href="/api-reference/virtual-accounts/create-single-use">
+    Generate a one-time collection account with an amount and expiry.
+  </Card>
+  <Card title="List virtual accounts" icon="list" href="/api-reference/virtual-accounts/list">
+    Retrieve every virtual account for your business.
+  </Card>
+  <Card title="Get virtual account by ID" icon="magnifying-glass" href="/api-reference/virtual-accounts/get">
+    Retrieve a single virtual account.
+  </Card>
+  <Card title="Withdraw funds" icon="arrow-up-from-bracket" href="/api-reference/funds/withdraw">
+    Move money out of a permanent virtual account.
+  </Card>
+</CardGroup>
+
+## The three account types
+
+### `permanent`
+
+A **permanent** virtual account behaves like a wallet: it can hold a running balance across any number of incoming payments. Funds received into it stay on the account until you explicitly move them — using [Withdraw funds](/api-reference/funds/withdraw) with the virtual account's `accountNumber` as `payerAccountNumber`, or a [virtual account transfer](/api-reference/funds/virtual-account-transfer).
+
+Use this when you want a persistent, individually-addressable balance — for example, one account per customer that accumulates their deposits over time.
+
+### `permanent_collection`
+
+A **permanent_collection** virtual account is also multi-use and long-lived, but it's a **pass-through**: it's not meant to be a place funds sit. It exists purely to identify the payer/purpose of a payment as it moves into your business's own pool account.
+
+Use this when you want a persistent, individually-addressable account number — for reconciliation purposes, say — but don't need a per-account balance; you just want everything ultimately settling in your one business account.
+
+### Single-use
+
+A [single-use virtual account](/api-reference/virtual-accounts/create-single-use) is disposable: created for one expected payment, tied to a specific `amount` and, optionally, a time window, then done. Like `permanent_collection`, it's a proxy — it exists to collect one specific payment and identify it, not to hold a balance. See [amount and duration matching](#amount-and-duration-matching) below for how Interstellas decides whether an incoming payment on one of these accounts is accepted.
+
+## Choosing a type
+
+| You want to... | Use |
+|---|---|
+| Hold a running balance per customer, withdrawable on demand | `permanent` |
+| A persistent account number that always settles to your pool account | `permanent_collection` |
+| A one-time account for a single expected payment (e.g. a checkout) | Single-use |
+
+## Amount and duration matching
+
+Single-use accounts are always constrained to an exact `amount`. They can optionally also be constrained to a `duration` window, **in minutes**, counted from creation — see [Create single-use virtual account](/api-reference/virtual-accounts/create-single-use) for the exact request shape.
+
+- **Amount** (always enforced): the incoming payment must exactly match the `amount` you set. Any difference — paying less *or* more — causes the transfer to automatically fail; it isn't credited as a completed collection.
+- **Duration** (optional): if you set one, a payment received after `duration` minutes have elapsed causes the transfer to automatically fail, even if the amount is exact. If you don't set a `duration`, the account never expires on its own and only the amount match applies.
+
+Design your integration around this: a payment on a single-use account either completes because it matched exactly (amount, and time window if set), or it fails outright.
+
+## Required identity information
+
+All permanent account types (`permanent` and `permanent_collection`) require a `bvn` (Bank Verification Number, 11 digits) for the account holder, in addition to `firstName`/`lastName`. Single-use accounts don't take a `bvn` from you directly — outside production, Interstellas generates a placeholder automatically; in production, it uses your business's own BVN on file.
+
+## Naming and casing
+
+Endpoints in this section are inconsistent about a couple of field names inherited from how each account type was built — for example, the single-use response uses `clientRef`/`systemRef`/`expirationTime`, while other parts of the API use slightly different names for conceptually similar fields. Rely on the field names documented on each endpoint's own reference page rather than assuming they generalize across account types.

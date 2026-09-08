@@ -1,0 +1,237 @@
+---
+title: "Create a bulk transfer"
+description: "Submit a batch of up to 5,000 transfers in a single request."
+---
+
+<Info>
+  New to bulk transfer? Read the [overview](/api-reference/bulk-transfers/overview) first — it explains statuses, reprocessing, and idempotency, all of which apply to this endpoint. Prefer working from a spreadsheet instead of building the JSON payload yourself? See [Upload via Excel](/api-reference/bulk-transfers/upload).
+</Info>
+
+Creating a bulk transfer validates and records every transfer in the batch, then returns immediately — a `201` response means the batch was **accepted**, not that any money has moved. Nothing executes yet at this point.
+
+<Warning>
+  Creating a batch does not start processing it. Immediately after this call, follow up with [Process a bulk transfer](/api-reference/bulk-transfers/process) using the returned `bulkTransferId` to actually begin executing the transfers.
+</Warning>
+
+## Endpoint
+
+```
+POST /clients/business/customers/funds/bulk-transfer
+```
+
+## Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID.
+</ParamField>
+
+## Request body
+
+<ParamField body="batchName" type="string" required>
+  A name for this batch, up to 255 characters. Must be unique among your business's bulk transfers — reusing a name returns `409 Conflict` instead of creating a second batch, so it's safe to retry a timed-out create request with the same `batchName`.
+</ParamField>
+
+<ParamField body="transfers" type="array" required>
+  A non-empty array of transfers to execute, up to 5,000 entries. Larger batches must be split across multiple requests.
+</ParamField>
+
+<ParamField body="transfers[].amount" type="string" required>
+  Amount to transfer, in **kobo**, e.g. `"100000"` for ₦1,000.
+</ParamField>
+
+<ParamField body="transfers[].receiverAccountNumber" type="string" required>
+  The destination bank account number to credit.
+</ParamField>
+
+<ParamField body="transfers[].receiverBankCode" type="string" required>
+  The bank code of the receiving bank.
+</ParamField>
+
+<ParamField body="transfers[].retrievalReference" type="string" required>
+  A unique reference you generate for this transfer. Must be unique across your business's entire transfer history — not just within this batch — and is also used for idempotency and reconciliation.
+</ParamField>
+
+<ParamField body="transfers[].narration" type="string">
+  A description of the transfer. Optional — defaults to an empty string if omitted.
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Confirmation message, e.g. `"Bulk transfer created successfully"`.
+</ResponseField>
+
+<ResponseField name="data.bulkTransferId" type="string">
+  Unique ID for this batch. Use this in every other bulk transfer endpoint.
+</ResponseField>
+
+<ResponseField name="data.bulkReference" type="string">
+  A human-readable reference for this batch, e.g. `"BULK-a1b2c3d4e5f6g7h8i9j0"`.
+</ResponseField>
+
+<ResponseField name="data.totalItems" type="integer">
+  The number of transfers accepted into this batch.
+</ResponseField>
+
+<ResponseField name="data.status" type="string">
+  Always `"pending"` in the create response — processing hasn't started yet. See [statuses](/api-reference/bulk-transfers/overview#statuses).
+</ResponseField>
+
+## Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
+  -H "businessId: YOUR_BUSINESS_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "batchName": "July salaries",
+    "transfers": [
+      {
+        "amount": "100000",
+        "receiverAccountNumber": "1234567890",
+        "receiverBankCode": "058",
+        "retrievalReference": "salary_2024_07_001",
+        "narration": "July salary"
+      },
+      {
+        "amount": "200000",
+        "receiverAccountNumber": "0987654321",
+        "receiverBankCode": "058",
+        "retrievalReference": "salary_2024_07_002",
+        "narration": "July salary"
+      }
+    ]
+  }'
+```
+
+```js Node.js
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer",
+  {
+    method: "POST",
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      batchName: "July salaries",
+      transfers: [
+        {
+          amount: "100000",
+          receiverAccountNumber: "1234567890",
+          receiverBankCode: "058",
+          retrievalReference: "salary_2024_07_001",
+          narration: "July salary",
+        },
+        {
+          amount: "200000",
+          receiverAccountNumber: "0987654321",
+          receiverBankCode: "058",
+          retrievalReference: "salary_2024_07_002",
+          narration: "July salary",
+        },
+      ],
+    }),
+  }
+);
+const { data } = await res.json();
+const bulkTransferId = data.bulkTransferId;
+```
+
+```python Python
+import requests
+
+res = requests.post(
+    "https://sandbox.stellasbank.com/api/v1/clients/business/customers/funds/bulk-transfer",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+        "businessId": "YOUR_BUSINESS_ID",
+    },
+    json={
+        "batchName": "July salaries",
+        "transfers": [
+            {
+                "amount": "100000",
+                "receiverAccountNumber": "1234567890",
+                "receiverBankCode": "058",
+                "retrievalReference": "salary_2024_07_001",
+                "narration": "July salary",
+            },
+            {
+                "amount": "200000",
+                "receiverAccountNumber": "0987654321",
+                "receiverBankCode": "058",
+                "retrievalReference": "salary_2024_07_002",
+                "narration": "July salary",
+            },
+        ],
+    },
+)
+data = res.json()["data"]
+bulk_transfer_id = data["bulkTransferId"]
+```
+</CodeGroup>
+
+## Example response
+
+```json
+{
+  "status": true,
+  "message": "Bulk transfer created successfully",
+  "data": {
+    "bulkTransferId": "6f9d3e2a-1b4c-4a8d-9e2f-3c1a2b4d5e6f",
+    "bulkReference": "BULK-a1b2c3d4e5f6g7h8i9j0",
+    "totalItems": 2,
+    "status": "pending"
+  }
+}
+```
+
+## Errors
+
+This endpoint returns `400 BAD_REQUEST` for any of the following, with a `message` describing which check failed:
+
+| Situation | Example message |
+|---|---|
+| `businessId` header missing | `"businessId is required in headers"` |
+| `transfers` missing or empty | `"transfers array is required and must not be empty"` |
+| `batchName` missing or blank | `"batchName is required"` |
+| More than 5,000 transfers | `"Maximum 5000 transfers allowed per bulk transfer request. Split larger batches into multiple requests."` |
+| A required field missing on one transfer | `"Transfer at index {i} is missing required fields"` |
+| Two transfers in the same request share a `retrievalReference` | `"Duplicate retrievalReference \"{ref}\" within the same request"` |
+| A `retrievalReference` was already used previously | `"Retrieval reference {ref} already exists"` |
+
+<Warning>
+  A repeated `batchName` for the same business returns `409 Conflict` (`"A batch named \"{batchName}\" already exists for this business"`), not `400` — check for `409` separately if you retry create requests automatically.
+</Warning>
+
+See [Errors](/essentials/errors) for the full envelope and error code reference.
+
+## Next step
+
+<CardGroup cols={2}>
+  <Card title="Process a bulk transfer" icon="play" href="/api-reference/bulk-transfers/process">
+    Start executing the transfers in this batch.
+  </Card>
+  <Card title="Delete" icon="trash" href="/api-reference/bulk-transfers/delete">
+    Made a mistake? Remove the batch or an item before processing.
+  </Card>
+</CardGroup>

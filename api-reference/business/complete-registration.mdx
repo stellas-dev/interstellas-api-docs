@@ -15,12 +15,12 @@ PATCH /clients/business/complete-registration
 
 ## Headers
 
-<ParamField header="Authorization" type="string" required>
-  `Bearer YOUR_ACCESS_TOKEN`
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
 </ParamField>
 
-<ParamField header="SECRET_KEY" type="string" required>
-  Your API secret key.
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
 </ParamField>
 
 ## Request body (multipart/form-data)
@@ -72,8 +72,8 @@ PATCH /clients/business/complete-registration
 <CodeGroup>
 ```bash cURL
 curl -X PATCH https://sandbox.stellasbank.com/api/v1/clients/business/complete-registration \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -H "SECRET_KEY: YOUR_SECRET_KEY" \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
   -F "businessId=YOUR_BUSINESS_ID" \
   -F "bvn=12345678901" \
   -F "residentialAddress=12 Marina Street, Lagos" \
@@ -100,8 +100,8 @@ const res = await fetch(
   {
     method: "PATCH",
     headers: {
-      Authorization: "Bearer YOUR_ACCESS_TOKEN",
-      SECRET_KEY: "YOUR_SECRET_KEY",
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
     },
     body: form,
   }
@@ -116,8 +116,8 @@ with open("/path/to/photo-id.jpg", "rb") as photo, open("/path/to/doc.pdf", "rb"
     res = requests.patch(
         "https://sandbox.stellasbank.com/api/v1/clients/business/complete-registration",
         headers={
-            "Authorization": "Bearer YOUR_ACCESS_TOKEN",
-            "SECRET_KEY": "YOUR_SECRET_KEY",
+            "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+            "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
         },
         data={
             "businessId": "YOUR_BUSINESS_ID",
