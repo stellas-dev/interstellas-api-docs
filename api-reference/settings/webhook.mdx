@@ -96,11 +96,202 @@ When a payment is received into one of your virtual accounts, Interstellas sends
 
 ### Verifying the request
 
-Incoming webhook requests include an `AUTH-KEY` header provided by Interstellas. Validate this header on your server to confirm the request originated from Interstellas and not a third party.
+Every webhook is signed with an HMAC-SHA256 signature so you can confirm it came from Interstellas and was not altered in transit. Always verify the signature before processing a notification.
+
+<Note>
+  Requests also carry a legacy static `AUTH-KEY` header. It is kept only for clients that have not yet adopted signature verification. Do not rely on it. Verify `X-Stellas-Signature` instead.
+</Note>
+
+#### Your webhook secret
+
+Signing uses a per-client **webhook secret** that starts with `whsec_`. Interstellas generates it once, when a webhook URL is first configured for your credentials, and signs every webhook with it from then on.
 
 <Warning>
-  **TODO** — The source documentation does not specify the format of the `AUTH-KEY` value or how to validate it. Confirm this with the Interstellas team before going live.
+  The secret is shown **only once**, at the moment it is generated, and is not returned by `GET /clients/settings/get-keys`. Store it in a secrets manager or environment variable and never commit it to source control or expose it to a browser or mobile app. If you lost it or suspect it leaked, contact [support](mailto:support@interstellas.stellasbank.com) to have it rotated.
 </Warning>
+
+If no webhook secret exists for your account, requests are sent **unsigned** (with only the legacy `AUTH-KEY`). Confirm with Interstellas that a secret has been issued to you before relying on signature checks.
+
+#### Signature headers
+
+<ParamField header="X-Stellas-Signature" type="string">
+  Lowercase hex-encoded HMAC-SHA256 digest of the signed string (see below).
+</ParamField>
+
+<ParamField header="X-Stellas-Timestamp" type="string">
+  Unix time in **milliseconds** (for example `1718028120000`) at which the signature was generated.
+</ParamField>
+
+#### How the signature is computed
+
+Interstellas builds the signature like this:
+
+1. Serialize the payload to a JSON string. This exact string is sent as the request body.
+2. Read the current time in milliseconds as `timestamp`.
+3. Build the signed string: `{timestamp}.{raw_body}`, joined with a single period.
+4. Compute `HMAC-SHA256` of the signed string using your `whsec_...` secret as the key.
+5. Hex-encode the digest and send it in `X-Stellas-Signature`. Send `timestamp` in `X-Stellas-Timestamp`.
+
+```text
+signed_string = timestamp + "." + raw_body
+signature     = hex( HMAC_SHA256(webhook_secret, signed_string) )
+```
+
+#### How to verify it on your server
+
+<Steps>
+  <Step title="Capture the raw body">
+    Read the request body **exactly as received**, before any JSON parsing. Re-serializing a parsed object can change whitespace or key order and will break the signature.
+  </Step>
+  <Step title="Read the headers">
+    Get `X-Stellas-Signature` and `X-Stellas-Timestamp`. Reject the request if either is missing.
+  </Step>
+  <Step title="Check the timestamp">
+    Reject requests whose timestamp is too old (we recommend a tolerance of 5 minutes). This blocks replay attacks.
+  </Step>
+  <Step title="Recompute the signature">
+    Compute `HMAC-SHA256` over `{timestamp}.{raw_body}` with your webhook secret and hex-encode it.
+  </Step>
+  <Step title="Compare in constant time">
+    Compare your value with `X-Stellas-Signature` using a constant-time comparison. Return `401` on a mismatch, and only process the payload if it matches.
+  </Step>
+</Steps>
+
+<CodeGroup>
+```js Node.js (Express)
+import express from "express";
+import crypto from "crypto";
+
+const app = express();
+const WEBHOOK_SECRET = process.env.INTERSTELLAS_WEBHOOK_SECRET; // whsec_...
+const TOLERANCE_MS = 5 * 60 * 1000;
+
+// Keep the raw body so the signature can be verified.
+app.post(
+  "/webhooks/interstellas",
+  express.raw({ type: "application/json" }),
+  (req, res) => {
+    const signature = req.get("X-Stellas-Signature");
+    const timestamp = req.get("X-Stellas-Timestamp");
+    const rawBody = req.body.toString("utf8");
+
+    if (!signature || !timestamp) {
+      return res.status(401).send("Missing signature");
+    }
+
+    // Reject stale requests (replay protection)
+    if (Math.abs(Date.now() - Number(timestamp)) > TOLERANCE_MS) {
+      return res.status(401).send("Timestamp outside tolerance");
+    }
+
+    const expected = crypto
+      .createHmac("sha256", WEBHOOK_SECRET)
+      .update(`${timestamp}.${rawBody}`)
+      .digest("hex");
+
+    const a = Buffer.from(expected, "utf8");
+    const b = Buffer.from(signature, "utf8");
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      return res.status(401).send("Invalid signature");
+    }
+
+    const payload = JSON.parse(rawBody);
+    console.log("Payment received:", payload.transactionReference);
+
+    res.status(200).send("OK");
+  }
+);
+```
+
+```python Python (Flask)
+import hashlib
+import hmac
+import os
+import time
+
+from flask import Flask, request, abort
+
+app = Flask(__name__)
+WEBHOOK_SECRET = os.environ["INTERSTELLAS_WEBHOOK_SECRET"]  # whsec_...
+TOLERANCE_MS = 5 * 60 * 1000
+
+
+@app.post("/webhooks/interstellas")
+def interstellas_webhook():
+    signature = request.headers.get("X-Stellas-Signature")
+    timestamp = request.headers.get("X-Stellas-Timestamp")
+    raw_body = request.get_data(as_text=True)  # raw, unparsed body
+
+    if not signature or not timestamp:
+        abort(401)
+
+    if abs(int(time.time() * 1000) - int(timestamp)) > TOLERANCE_MS:
+        abort(401)
+
+    expected = hmac.new(
+        WEBHOOK_SECRET.encode(),
+        f"{timestamp}.{raw_body}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected, signature):
+        abort(401)
+
+    payload = request.get_json()
+    print("Payment received:", payload["transactionReference"])
+    return "OK", 200
+```
+
+```php PHP
+<?php
+$secret    = getenv('INTERSTELLAS_WEBHOOK_SECRET'); // whsec_...
+$signature = $_SERVER['HTTP_X_STELLAS_SIGNATURE'] ?? '';
+$timestamp = $_SERVER['HTTP_X_STELLAS_TIMESTAMP'] ?? '';
+$rawBody   = file_get_contents('php://input');
+
+if ($signature === '' || $timestamp === '') {
+    http_response_code(401);
+    exit('Missing signature');
+}
+
+if (abs(round(microtime(true) * 1000) - (int) $timestamp) > 5 * 60 * 1000) {
+    http_response_code(401);
+    exit('Timestamp outside tolerance');
+}
+
+$expected = hash_hmac('sha256', $timestamp . '.' . $rawBody, $secret);
+
+if (!hash_equals($expected, $signature)) {
+    http_response_code(401);
+    exit('Invalid signature');
+}
+
+$payload = json_decode($rawBody, true);
+http_response_code(200);
+echo 'OK';
+```
+</CodeGroup>
+
+#### Testing your implementation
+
+You can generate a valid signature locally to test your endpoint:
+
+```bash
+SECRET="whsec_your_secret"
+TIMESTAMP=$(($(date +%s) * 1000))
+BODY='{"transactionReference":"TXN_REF_ABC001","amount":500000}'
+SIGNATURE=$(printf '%s' "${TIMESTAMP}.${BODY}" | openssl dgst -sha256 -hmac "$SECRET" -hex | sed 's/^.* //')
+
+curl -X POST https://yourdomain.com/webhooks/interstellas \
+  -H "Content-Type: application/json" \
+  -H "X-Stellas-Timestamp: $TIMESTAMP" \
+  -H "X-Stellas-Signature: $SIGNATURE" \
+  -d "$BODY"
+```
+
+<Tip>
+  Common causes of a signature mismatch: parsing the body before hashing, hashing a re-serialized object, using the wrong secret (test vs. live), or a trailing newline added to the body.
+</Tip>
 
 ### Payload fields
 
@@ -185,15 +376,4 @@ Incoming webhook requests include an `AUTH-KEY` header provided by Interstellas.
 
 Your endpoint must return `HTTP 200 OK` to acknowledge receipt. If Interstellas does not receive a `200`, it will retry the notification.
 
-```js Node.js (Express)
-app.post("/webhooks/interstellas", (req, res) => {
-  const authKey = req.headers["auth-key"];
-  // TODO: validate authKey against your expected value
-
-  const payload = req.body;
-  // Process the payment notification
-  console.log("Payment received:", payload.transactionReference);
-
-  res.status(200).send("OK");
-});
-```
+See [Verifying the request](#verifying-the-request) for a complete handler that checks the signature before returning `200`.
