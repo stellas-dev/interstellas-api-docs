@@ -1,0 +1,104 @@
+---
+title: "List banks"
+description: "Retrieve the list of supported banks and their codes."
+---
+
+Returns the banks you can send transfers to, with the bank code to pass to [name enquiry](/api-reference/banks/name-enquiry) and transfer endpoints. The list always begins with Stellas.
+
+## Endpoint
+
+```
+GET /banks
+```
+
+## Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+## Query parameters
+
+<ParamField query="nibssCode" type="boolean">
+  Set to `true` to return standard NIBSS bank codes instead of Interstellas' internal codes. When enabled, each item uses a `bankCode` field instead of `code`. Defaults to `false`.
+</ParamField>
+
+<Note>
+  Use the same code format everywhere. If you list banks with `nibssCode=true`, pass `nibssCode=true` on name enquiry too.
+</Note>
+
+## Response
+
+<ResponseField name="status" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Confirmation message.
+</ResponseField>
+
+<ResponseField name="data" type="array">
+  List of banks.
+</ResponseField>
+
+<ResponseField name="data[].name" type="string">
+  The bank's name.
+</ResponseField>
+
+<ResponseField name="data[].code" type="string">
+  The bank code. Returned when `nibssCode` is not set.
+</ResponseField>
+
+<ResponseField name="data[].bankCode" type="string">
+  The NIBSS bank code. Returned instead of `code` when `nibssCode=true`.
+</ResponseField>
+
+### Example response
+
+```json
+{
+  "status": true,
+  "message": "Successful",
+  "data": [
+    { "name": "Stellas", "code": "090XXX" },
+    { "name": "Example Bank", "code": "058" }
+  ]
+}
+```
+
+## Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X GET "https://sandbox.stellasbank.com/api/v1/banks" \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0"
+```
+
+```js Node.js
+const res = await fetch("https://sandbox.stellasbank.com/api/v1/banks", {
+  headers: {
+    "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+    "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+  },
+});
+const json = await res.json();
+```
+
+```python Python
+import requests
+
+res = requests.get(
+    "https://sandbox.stellasbank.com/api/v1/banks",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+    },
+)
+print(res.json())
+```
+</CodeGroup>

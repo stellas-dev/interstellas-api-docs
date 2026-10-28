@@ -1,0 +1,226 @@
+---
+title: "List virtual account transactions"
+description: "List and search payments received into your business's virtual accounts."
+---
+
+## Endpoint
+
+```
+GET /clients/business/virtual-accounts/transactions
+```
+
+## Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID.
+</ParamField>
+
+## Query parameters
+
+<ParamField query="page" type="integer">
+  Page number. Defaults to `1`.
+</ParamField>
+
+<ParamField query="limit" type="integer">
+  Records per page. Defaults to `10`.
+</ParamField>
+
+<ParamField query="keyword" type="string">
+  Case-insensitive partial match across transaction ID, status, transaction type and details, amount expected, amount received, narration, retrieval reference, source and destination account numbers and names, and virtual account reference.
+</ParamField>
+
+<ParamField query="status" type="string">
+  Comma-separated statuses, for example `completed,pending`. Pass `showall` for all.
+</ParamField>
+
+<ParamField query="transactionType" type="string">
+  Comma-separated types, for example `credit`. Pass `showall` for all.
+</ParamField>
+
+<ParamField query="transactionTypeDetails" type="string">
+  Comma-separated sub-types. Pass `showall` for all.
+</ParamField>
+
+<ParamField query="amount" type="string">
+  Exact amount received, in kobo.
+</ParamField>
+
+<ParamField query="virtualAccountRef" type="string">
+  Only transactions for this virtual account reference.
+</ParamField>
+
+<ParamField query="accountType" type="string">
+  `virtual` or `nuban`.
+</ParamField>
+
+<ParamField query="dateFrom" type="string">
+  ISO 8601 date. Only include transactions on or after this date. Defaults to `2020-01-01`.
+</ParamField>
+
+<ParamField query="dateTo" type="string">
+  ISO 8601 date. Only include transactions up to and including this day. Defaults to now.
+</ParamField>
+
+See [Pagination](/essentials/pagination). This endpoint uses Shape B. Unlike [List transactions](/api-reference/transactions/list), it has no `sortBy`, `amountRange`, `transactionId` or `customerId` filters and no `summary`; results are newest first.
+
+## Response
+
+<ResponseField name="status" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable outcome.
+</ResponseField>
+
+<ResponseField name="data" type="array">
+  Array of virtual account transaction objects.
+</ResponseField>
+
+<ResponseField name="data[].id" type="string">
+  Unique record ID.
+</ResponseField>
+
+<ResponseField name="data[].transactionId" type="string">
+  Interstellas' transaction ID.
+</ResponseField>
+
+<ResponseField name="data[].transactionType" type="string">
+  `credit` or `debit`.
+</ResponseField>
+
+<ResponseField name="data[].transactionTypeDetails" type="string">
+  Transaction sub-type.
+</ResponseField>
+
+<ResponseField name="data[].status" type="string">
+  Transaction status.
+</ResponseField>
+
+<ResponseField name="data[].amountExpected" type="string">
+  Amount the account was expecting, in kobo.
+</ResponseField>
+
+<ResponseField name="data[].amountReceived" type="string">
+  Amount actually received, in kobo.
+</ResponseField>
+
+<ResponseField name="data[].transactionCharge" type="string">
+  Fee charged, in kobo.
+</ResponseField>
+
+<ResponseField name="data[].narration" type="string">
+  Transaction narration.
+</ResponseField>
+
+<ResponseField name="data[].retrievalReference" type="string">
+  Reference for the transaction.
+</ResponseField>
+
+<ResponseField name="data[].sourceAccountInfo" type="string">
+  Paying account number.
+</ResponseField>
+
+<ResponseField name="data[].sourceAccountName" type="string">
+  Paying account name.
+</ResponseField>
+
+<ResponseField name="data[].destinationAccountInfo" type="string">
+  Receiving account number.
+</ResponseField>
+
+<ResponseField name="data[].destinationAccountName" type="string">
+  Receiving account name.
+</ResponseField>
+
+<ResponseField name="data[].accountType" type="string">
+  `virtual` or `nuban`.
+</ResponseField>
+
+<ResponseField name="data[].virtualAccountRef" type="string">
+  The virtual account reference.
+</ResponseField>
+
+<ResponseField name="data[].paymentDate" type="string">
+  ISO 8601 timestamp the transaction was created.
+</ResponseField>
+
+<ResponseField name="data[].businessId" type="string">
+  Business the transaction belongs to.
+</ResponseField>
+
+<ResponseField name="data[].clientId" type="string">
+  Client the transaction belongs to.
+</ResponseField>
+
+### Example response
+
+```json
+{
+  "status": true,
+  "message": "Successful",
+  "data": [
+    {
+      "id": "b1c2d3e4-0000-4000-8000-abcdefabcdef",
+      "transactionId": "TXN_VA_001",
+      "transactionType": "credit",
+      "status": "completed",
+      "amountExpected": "500000",
+      "amountReceived": "500000",
+      "transactionCharge": "10000",
+      "narration": "Payment for order_12345",
+      "virtualAccountRef": "VA_REF_XYZ789",
+      "accountType": "virtual",
+      "paymentDate": "2024-06-09T14:22:00.000Z"
+    }
+  ],
+  "pagination": { "page": 1, "limit": 10, "total": 1, "totalPages": 1 }
+}
+```
+
+## Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X GET https://sandbox.stellasbank.com/api/v1/clients/business/virtual-accounts/transactions?virtualAccountRef=VA_REF_XYZ789&status=completed&dateFrom=2024-06-01 \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "businessId: YOUR_BUSINESS_ID" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0"
+```
+
+```js Node.js
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/virtual-accounts/transactions?virtualAccountRef=VA_REF_XYZ789&status=completed&dateFrom=2024-06-01",
+  {
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+    },
+  }
+);
+const json = await res.json();
+```
+
+```python Python
+import requests
+
+res = requests.get(
+    "https://sandbox.stellasbank.com/api/v1/clients/business/virtual-accounts/transactions?virtualAccountRef=VA_REF_XYZ789&status=completed&dateFrom=2024-06-01",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+        "businessId": "YOUR_BUSINESS_ID",
+    },
+)
+print(res.json())
+```
+</CodeGroup>

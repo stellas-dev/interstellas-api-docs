@@ -1,0 +1,130 @@
+---
+title: "Name enquiry"
+description: "Resolve the account name for a bank account number before sending money."
+---
+
+Confirm who owns an account before you transfer to it. Get `bankCode` from [List banks](/api-reference/banks/list).
+
+## Endpoint
+
+```
+POST /clients/business/customers/name-enquiry
+```
+
+## Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID.
+</ParamField>
+
+## Query parameters
+
+<ParamField query="nibssCode" type="boolean">
+  Set to `true` if the `bankCode` you send is a NIBSS code. Use the same format you used when listing banks. Defaults to `false`.
+</ParamField>
+
+## Request body
+
+<ParamField body="accountNumber" type="string" required>
+  The account number to resolve.
+</ParamField>
+
+<ParamField body="bankCode" type="string" required>
+  The code of the bank that holds the account.
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Confirmation message.
+</ResponseField>
+
+<ResponseField name="data.name" type="string">
+  The account holder's name.
+</ResponseField>
+
+<ResponseField name="data.bvn" type="string">
+  BVN associated with the account, where available.
+</ResponseField>
+
+<ResponseField name="data.kyc" type="string">
+  KYC level of the account, where available.
+</ResponseField>
+
+### Example response
+
+```json
+{
+  "status": true,
+  "message": "Successful",
+  "data": {
+    "name": "ADA LOVELACE",
+    "bvn": "",
+    "kyc": ""
+  }
+}
+```
+
+<Note>
+  If the account can't be resolved, the request fails with `400` and a message from the bank. See [Errors](/essentials/errors).
+</Note>
+
+## Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://sandbox.stellasbank.com/api/v1/clients/business/customers/name-enquiry \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
+  -H "businessId: YOUR_BUSINESS_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "accountNumber": "0123456789",
+    "bankCode": "058"
+  }'
+```
+
+```js Node.js
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/customers/name-enquiry",
+  {
+    method: "POST",
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ accountNumber: "0123456789", bankCode: "058" }),
+  }
+);
+const json = await res.json();
+```
+
+```python Python
+import requests
+
+res = requests.post(
+    "https://sandbox.stellasbank.com/api/v1/clients/business/customers/name-enquiry",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+        "businessId": "YOUR_BUSINESS_ID",
+    },
+    json={"accountNumber": "0123456789", "bankCode": "058"},
+)
+print(res.json())
+```
+</CodeGroup>

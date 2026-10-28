@@ -1,0 +1,295 @@
+---
+title: "List transactions"
+description: "List and search the transactions for a business, with filters, sorting and pagination."
+---
+
+Returns transactions for the business in your `businessId` header. Use the query parameters to search and filter. To list across every business under your account, use [List transactions by client](/api-reference/transactions/list-by-client).
+
+## Endpoint
+
+```
+GET /clients/business/transactions
+```
+
+## Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID.
+</ParamField>
+
+## Query parameters
+
+### Pagination and sorting
+
+<ParamField query="page" type="integer">
+  Page number. Defaults to `1`.
+</ParamField>
+
+<ParamField query="limit" type="integer">
+  Records per page. Defaults to `10`.
+</ParamField>
+
+<ParamField query="sortBy" type="string">
+  Field to sort by: `createdAt` (default), `amount`, `status` or `transactionType`. `amount` sorts numerically. Any other value returns `400`.
+</ParamField>
+
+<ParamField query="sortOrder" type="string">
+  `asc` or `desc`. Defaults to `desc` (newest first).
+</ParamField>
+
+### Search
+
+<ParamField query="keyword" type="string">
+  Case-insensitive partial match across customer email, transaction ID, payment method, status, transaction type and details, amount, narration, retrieval reference, source and destination account numbers and names, and virtual account reference. Returns any transaction where at least one of these fields contains the text.
+</ParamField>
+
+### Filters
+
+<ParamField query="status" type="string">
+  Comma-separated statuses, for example `completed,pending`. Values: `completed`, `failed`, `pending`. Pass `showall` to include every status.
+</ParamField>
+
+<ParamField query="transactionType" type="string">
+  Comma-separated types: `credit`, `debit`. Pass `showall` for both.
+</ParamField>
+
+<ParamField query="transactionTypeDetails" type="string">
+  Comma-separated sub-types, for example `inter_bank,intra_bank`. Values include `inter_bank`, `intra_bank`, `inter_bank_anonymous`, `intra_bank_anonymous`, `card_payment`, `bills`, `airtime` and `billing_charge`. Pass `showall` for all.
+</ParamField>
+
+<ParamField query="amount" type="string">
+  Exact amount, in kobo.
+</ParamField>
+
+<ParamField query="amountRange" type="string">
+  Amount range in kobo, as `min-max`. Either side may be left out: `100000-500000`, `100000-` (at least), `-500000` (at most). A malformed range, or a min greater than max, returns `400`.
+</ParamField>
+
+<ParamField query="transactionId" type="string">
+  Exact Interstellas transaction ID.
+</ParamField>
+
+<ParamField query="retrievalReference" type="string">
+  Exact `retrievalReference` you supplied when creating the transaction.
+</ParamField>
+
+<ParamField query="virtualAccountRef" type="string">
+  Only transactions linked to this virtual account reference.
+</ParamField>
+
+<ParamField query="accountType" type="string">
+  `virtual` or `nuban`.
+</ParamField>
+
+<ParamField query="customerId" type="string">
+  Customer **email address**. Only transactions for that customer are returned. A value that isn't a valid email is ignored.
+</ParamField>
+
+<ParamField query="dateFrom" type="string">
+  ISO 8601 date. Only include transactions on or after this date. Defaults to `2020-01-01`.
+</ParamField>
+
+<ParamField query="dateTo" type="string">
+  ISO 8601 date. Only include transactions up to and including this day. Defaults to now.
+</ParamField>
+
+Filters combine with AND. `keyword` matches across its fields (OR), and the result must still satisfy every other filter.
+
+See [Pagination](/essentials/pagination). This endpoint uses Shape B.
+
+## Response
+
+<ResponseField name="status" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable outcome.
+</ResponseField>
+
+<ResponseField name="data" type="array">
+  Array of transaction objects.
+</ResponseField>
+
+<ResponseField name="data[].id" type="string">
+  Unique record ID (UUID). Use it with [Get transaction by ID](/api-reference/transactions/get).
+</ResponseField>
+
+<ResponseField name="data[].transactionId" type="string">
+  Interstellas' transaction ID.
+</ResponseField>
+
+<ResponseField name="data[].transactionType" type="string">
+  `credit` or `debit`.
+</ResponseField>
+
+<ResponseField name="data[].transactionTypeDetails" type="string">
+  Sub-type, for example `inter_bank`.
+</ResponseField>
+
+<ResponseField name="data[].paymentMethod" type="string">
+  `transfer`, `card` or `bank`.
+</ResponseField>
+
+<ResponseField name="data[].status" type="string">
+  `completed`, `failed` or `pending`.
+</ResponseField>
+
+<ResponseField name="data[].amount" type="string">
+  Amount in kobo.
+</ResponseField>
+
+<ResponseField name="data[].transactionCharge" type="string">
+  Fee charged, in kobo.
+</ResponseField>
+
+<ResponseField name="data[].totalCharge" type="string">
+  Total debited including charge, in kobo.
+</ResponseField>
+
+<ResponseField name="data[].narration" type="string">
+  Transaction narration.
+</ResponseField>
+
+<ResponseField name="data[].retrievalReference" type="string">
+  The reference you supplied.
+</ResponseField>
+
+<ResponseField name="data[].sourceAccountInfo" type="string">
+  Source account number.
+</ResponseField>
+
+<ResponseField name="data[].sourceAccountName" type="string">
+  Source account name.
+</ResponseField>
+
+<ResponseField name="data[].destinationAccountInfo" type="string">
+  Destination account number.
+</ResponseField>
+
+<ResponseField name="data[].destinationAccountName" type="string">
+  Destination account name.
+</ResponseField>
+
+<ResponseField name="data[].customerName" type="string">
+  Customer name.
+</ResponseField>
+
+<ResponseField name="data[].customerEmail" type="string">
+  Customer email.
+</ResponseField>
+
+<ResponseField name="data[].customerId" type="string">
+  Customer ID.
+</ResponseField>
+
+<ResponseField name="data[].virtualAccountRef" type="string">
+  Linked virtual account reference, if any.
+</ResponseField>
+
+<ResponseField name="data[].paymentDate" type="string">
+  ISO 8601 timestamp the transaction was created.
+</ResponseField>
+
+<ResponseField name="data[].businessId" type="string">
+  Business the transaction belongs to.
+</ResponseField>
+
+<ResponseField name="data[].clientId" type="string">
+  Client the transaction belongs to.
+</ResponseField>
+
+<ResponseField name="summary.totalCredit" type="number">
+  Sum of **completed credit** amounts on **this page only**, in kobo.
+</ResponseField>
+
+<ResponseField name="summary.totalDebit" type="number">
+  Sum of **completed debit** amounts on **this page only**, in kobo.
+</ResponseField>
+
+<ResponseField name="summary.netFlow" type="number">
+  `totalCredit - totalDebit` for this page.
+</ResponseField>
+
+<Note>
+  `summary` covers only the rows returned on the current page, not every transaction matching your filters. Failed and pending transactions are excluded.
+</Note>
+
+### Example response
+
+```json
+{
+  "status": true,
+  "message": "Successful",
+  "data": [
+    {
+      "id": "7f9c1e2a-3b4d-4c5e-8f60-1234567890ab",
+      "transactionId": "TXN_ABC123",
+      "transactionType": "debit",
+      "transactionTypeDetails": "inter_bank",
+      "paymentMethod": "transfer",
+      "status": "completed",
+      "amount": "500000",
+      "transactionCharge": "5000",
+      "totalCharge": "505000",
+      "narration": "Invoice #INV-001",
+      "retrievalReference": "transfer_ref_001",
+      "sourceAccountInfo": "9012345678",
+      "sourceAccountName": "Ada Lovelace",
+      "destinationAccountInfo": "0123456789",
+      "destinationAccountName": "Grace Hopper",
+      "customerEmail": "ada@example.com",
+      "paymentDate": "2024-06-09T14:22:00.000Z"
+    }
+  ],
+  "pagination": { "page": 1, "limit": 10, "total": 1, "totalPages": 1 },
+  "summary": { "totalCredit": 0, "totalDebit": 500000, "netFlow": -500000 }
+}
+```
+
+## Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X GET https://sandbox.stellasbank.com/api/v1/clients/business/transactions?status=completed&transactionType=debit&amountRange=100000-&dateFrom=2024-06-01&limit=25 \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "businessId: YOUR_BUSINESS_ID" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0"
+```
+
+```js Node.js
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/transactions?status=completed&transactionType=debit&amountRange=100000-&dateFrom=2024-06-01&limit=25",
+  {
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+    },
+  }
+);
+const json = await res.json();
+```
+
+```python Python
+import requests
+
+res = requests.get(
+    "https://sandbox.stellasbank.com/api/v1/clients/business/transactions?status=completed&transactionType=debit&amountRange=100000-&dateFrom=2024-06-01&limit=25",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+        "businessId": "YOUR_BUSINESS_ID",
+    },
+)
+print(res.json())
+```
+</CodeGroup>

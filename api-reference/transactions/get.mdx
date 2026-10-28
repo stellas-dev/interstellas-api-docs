@@ -1,0 +1,155 @@
+---
+title: "Get transaction by ID"
+description: "Retrieve a single transaction by its record ID or transaction ID."
+---
+
+## Endpoint
+
+```
+GET /clients/business/transactions/{id}
+```
+
+## Path parameters
+
+<ParamField path="id" type="string" required>
+  Either the transaction's record `id` (UUID) or its `transactionId`, both returned by [List transactions](/api-reference/transactions/list).
+</ParamField>
+
+## Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID.
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable outcome.
+</ResponseField>
+
+<ResponseField name="data.id" type="string">
+  Record ID (UUID).
+</ResponseField>
+
+<ResponseField name="data.transactionId" type="string">
+  Interstellas' transaction ID.
+</ResponseField>
+
+<ResponseField name="data.transactionType" type="string">
+  `credit` or `debit`.
+</ResponseField>
+
+<ResponseField name="data.paymentMethod" type="string">
+  `transfer`, `card` or `bank`.
+</ResponseField>
+
+<ResponseField name="data.status" type="string">
+  `completed`, `failed` or `pending`.
+</ResponseField>
+
+<ResponseField name="data.amount" type="string">
+  Amount in kobo.
+</ResponseField>
+
+<ResponseField name="data.transactionCharge" type="string">
+  Fee charged, in kobo.
+</ResponseField>
+
+<ResponseField name="data.totalCharge" type="string">
+  Total debited including charge, in kobo.
+</ResponseField>
+
+<ResponseField name="data.narration" type="string">
+  Transaction narration.
+</ResponseField>
+
+<ResponseField name="data.retrievalReference" type="string">
+  The reference you supplied.
+</ResponseField>
+
+<ResponseField name="data.sourceAccountInfo" type="string">
+  Source account number.
+</ResponseField>
+
+<ResponseField name="data.sourceAccountName" type="string">
+  Source account name.
+</ResponseField>
+
+<ResponseField name="data.destinationAccountInfo" type="string">
+  Destination account number.
+</ResponseField>
+
+<ResponseField name="data.destinationAccountName" type="string">
+  Destination account name.
+</ResponseField>
+
+<ResponseField name="data.customerName" type="string">
+  Customer name.
+</ResponseField>
+
+<ResponseField name="data.customerEmail" type="string">
+  Customer email.
+</ResponseField>
+
+<ResponseField name="data.customerId" type="string">
+  Customer ID.
+</ResponseField>
+
+<ResponseField name="data.paymentDate" type="string">
+  ISO 8601 payment date.
+</ResponseField>
+
+<Note>
+  If no transaction with this ID exists for your business, the request fails with `404` and `"Transaction Not Found"`.
+</Note>
+
+## Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X GET https://sandbox.stellasbank.com/api/v1/clients/business/transactions/TXN_ABC123 \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "businessId: YOUR_BUSINESS_ID" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0"
+```
+
+```js Node.js
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/transactions/TXN_ABC123",
+  {
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+    },
+  }
+);
+const json = await res.json();
+```
+
+```python Python
+import requests
+
+res = requests.get(
+    "https://sandbox.stellasbank.com/api/v1/clients/business/transactions/TXN_ABC123",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+        "businessId": "YOUR_BUSINESS_ID",
+    },
+)
+print(res.json())
+```
+</CodeGroup>

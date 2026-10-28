@@ -1,0 +1,145 @@
+---
+title: "Requery transaction"
+description: "Check the latest status of a transaction using its retrieval reference."
+---
+
+Use this when a transfer returns a pending or unclear result, or you never received the response. Interstellas checks the current status, updates the transaction record, and returns it.
+
+## Endpoint
+
+```
+POST /clients/business/transactions/requery
+```
+
+## Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your public API key.
+</ParamField>
+
+<ParamField header="x-api-secret" type="string" required>
+  Your API secret. Use a `stl_test_...` value in sandbox, `stl_live_...` in production.
+</ParamField>
+
+<ParamField header="businessId" type="string" required>
+  Your business ID.
+</ParamField>
+
+## Request body
+
+<ParamField body="retrievalReference" type="string" required>
+  The unique `retrievalReference` you sent when you created the transaction.
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="boolean">
+  `true` on success.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Confirmation message.
+</ResponseField>
+
+<ResponseField name="data.amount" type="string">
+  Transaction amount, in kobo.
+</ResponseField>
+
+<ResponseField name="data.transactionCharge" type="string">
+  Fee charged, in kobo.
+</ResponseField>
+
+<ResponseField name="data.totalAmount" type="string">
+  Total debited (amount + charge), in kobo.
+</ResponseField>
+
+<ResponseField name="data.balanceAfter" type="string">
+  Account balance after the transaction, where available.
+</ResponseField>
+
+<ResponseField name="data.transactionId" type="string">
+  Interstellas' ID for the transaction.
+</ResponseField>
+
+<ResponseField name="data.transactionStatus" type="string">
+  The status after requery, for example `completed`. Only present when the status changed during this requery.
+</ResponseField>
+
+<ResponseField name="data.transactionType" type="string">
+  The type of transaction.
+</ResponseField>
+
+<ResponseField name="data.transactionTypeDetails" type="string">
+  Further detail on the transaction type.
+</ResponseField>
+
+<ResponseField name="data.narration" type="string">
+  The transaction narration.
+</ResponseField>
+
+### Example response
+
+```json
+{
+  "status": true,
+  "message": "Successful",
+  "data": {
+    "amount": "500000",
+    "transactionCharge": "5000",
+    "totalAmount": "505000",
+    "transactionId": "TXN_ABC123",
+    "transactionStatus": "completed",
+    "transactionType": "transfer",
+    "narration": "Invoice #INV-001"
+  }
+}
+```
+
+<Note>
+  If no transaction matches `retrievalReference`, the request fails with `400` and `"Transaction not found"`.
+</Note>
+
+## Code examples
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://sandbox.stellasbank.com/api/v1/clients/business/transactions/requery \
+  -H "x-api-key: stl_c8e286ca55b0123e0b05da047494f585" \
+  -H "x-api-secret: stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0" \
+  -H "businessId: YOUR_BUSINESS_ID" \
+  -H "Content-Type: application/json" \
+  -d '{ "retrievalReference": "transfer_ref_001" }'
+```
+
+```js Node.js
+const res = await fetch(
+  "https://sandbox.stellasbank.com/api/v1/clients/business/transactions/requery",
+  {
+    method: "POST",
+    headers: {
+      "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+      "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+      businessId: "YOUR_BUSINESS_ID",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ retrievalReference: "transfer_ref_001" }),
+  }
+);
+const json = await res.json();
+```
+
+```python Python
+import requests
+
+res = requests.post(
+    "https://sandbox.stellasbank.com/api/v1/clients/business/transactions/requery",
+    headers={
+        "x-api-key": "stl_c8e286ca55b0123e0b05da047494f585",
+        "x-api-secret": "stl_test_6332e4b1dd6c2e5814395b549aec6deb0d0664406c66f2285f95f801c76117c0",
+        "businessId": "YOUR_BUSINESS_ID",
+    },
+    json={"retrievalReference": "transfer_ref_001"},
+)
+print(res.json())
+```
+</CodeGroup>
